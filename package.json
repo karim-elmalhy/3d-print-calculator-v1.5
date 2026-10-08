@@ -1,2 +1,10 @@
-{ "name": "3d-print-calculator-pro", "version": "2.0.0", "private": true,
-  "scripts": { "test": "node --test tests/calc.test.js tests/reports.test.js" } }
+{
+  "name": "elmalhy-3d-workshop-manager",
+  "version": "1.0.0",
+  "description": "نظام إدارة ورشة ELMALHY.3D المتكامل للطباعة ثلاثية الأبعاد",
+  "private": true,
+  "type": "commonjs",
+  "scripts": {
+    "test": "node --test tests/calc.test.js tests/inventory.test.js tests/workflow.test.js tests/reports.test.js"
+  }
+}
