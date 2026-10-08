@@ -13,7 +13,7 @@
   <aside class="sidebar">
     <div class="brand-header">
       <div class="brand-logo">🏭</div>
-      <div>
+      <div class="brand-text">
         <div class="brand-title">ELMALHY.3D</div>
         <div class="brand-subtitle">Workshop Manager v2.0</div>
       </div>
@@ -22,6 +22,9 @@
     <ul class="nav-menu">
       <li class="nav-item active" data-tab="dashboard">
         <button><span class="nav-icon">📊</span><span>لوحة التحكم</span></button>
+      </li>
+      <li class="nav-item" data-tab="calculator">
+        <button><span class="nav-icon">🧮</span><span>حاسبة التسعير المتكاملة</span></button>
       </li>
       <li class="nav-item" data-tab="orders">
         <button><span class="nav-icon">📦</span><span>مسار الطلبات والإنتاج</span></button>
@@ -51,8 +54,11 @@
     </ul>
 
     <div class="sidebar-footer">
-      <span>الحالة: <strong style="color: var(--accent-green)">أوفلاين / محلي</strong></span>
-      <span id="active-printer-status">🖨️ جاهزة</span>
+      <div style="display:flex; align-items:center; gap:6px">
+        <div class="status-dot"></div>
+        <span class="status-text">أوفلاين • محلي</span>
+      </div>
+      <span id="active-printer-status" style="font-size:0.75rem; color:var(--text-muted)">🖨️ جاهزة</span>
     </div>
   </aside>
 
@@ -541,6 +547,213 @@
       </div>
     </section>
 
+    <!-- تبويب حاسبة التسعير المتكاملة -->
+    <section id="tab-calculator" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>🧮 حاسبة تسعير الطباعة ثلاثية الأبعاد</h1>
+          <p>احسب تكلفة وسعر بيع أي قطعة بدقة — تستخدم إعدادات طابعتك وأسعار المخزون الحالية تلقائياً</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-success" onclick="App.calcSaveAsQuote()">💾 حفظ كعرض سعر جديد</button>
+          <button class="btn btn-secondary" onclick="App.calcReset()">↺ إعادة تعيين</button>
+        </div>
+      </div>
+
+      <div class="calc-layout">
+        <!-- إدخالات الحاسبة -->
+        <div>
+          <!-- الخامة والوزن -->
+          <div class="calc-panel" style="margin-bottom:18px">
+            <div class="calc-section-title">📦 الخامة ومواصفات القطعة</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">نوع الخامة (Material)</label>
+                <select id="calc-material" class="form-control" onchange="App.onCalcMaterialChange()">
+                  <option value="pla_plus" data-spool="700">PLA+</option>
+                  <option value="pla" data-spool="600">PLA</option>
+                  <option value="petg" data-spool="750">PETG</option>
+                  <option value="abs" data-spool="650">ABS</option>
+                  <option value="tpu" data-spool="950">TPU 95A</option>
+                  <option value="asa" data-spool="900">ASA</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">سعر البكرة (ج.م / 1000g)</label>
+                <input type="number" id="calc-spool-price" class="form-control" value="700" step="10" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">وزن القطعة (جرام) <span class="form-helper">من برنامج التقطيع Slicer</span></label>
+                <input type="number" id="calc-weight" class="form-control" value="50" step="0.5" oninput="App.calcUpdate()" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">الكمية المطلوبة</label>
+                <input type="number" id="calc-qty" class="form-control" value="1" min="1" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-group">
+              <label class="form-label">⚡ تحويل طول الفلمنت لوزن بالجرام (اختياري)</label>
+              <div class="form-row">
+                <input type="number" id="calc-length-mm" class="form-control" placeholder="الطول بالملليمتر (من G-code)" oninput="App.calcConvertLength()">
+                <select id="calc-diameter" class="form-control" onchange="App.calcConvertLength()">
+                  <option value="1.75">قطر Ø 1.75 mm (الافتراضي)</option>
+                  <option value="2.85">قطر Ø 2.85 mm</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          <!-- الطباعة والطابعة -->
+          <div class="calc-panel" style="margin-bottom:18px">
+            <div class="calc-section-title">🖨️ بيانات الطباعة والطابعة</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">وقت الطباعة المقدر (ساعات)</label>
+                <input type="number" id="calc-hours" class="form-control" value="2.5" step="0.1" oninput="App.calcUpdate()" required>
+              </div>
+              <div class="form-group">
+                <label class="form-label">معدل الفشل المتوقع (%)</label>
+                <input type="number" id="calc-failure" class="form-control" value="5" min="0" max="50" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">استهلاك الطابعة (kW)</label>
+                <input type="number" id="calc-power" class="form-control" value="0.22" step="0.01" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">سعر الكهرباء (ج.م/kWh)</label>
+                <input type="number" id="calc-elec-rate" class="form-control" value="2.5" step="0.1" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">إهلاك الطابعة (ج.م/ساعة)</label>
+                <input type="number" id="calc-deprec" class="form-control" value="3.67" step="0.1" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">مستهلكات وصيانة (ج.م/ساعة)</label>
+                <input type="number" id="calc-consumables" class="form-control" value="5.0" step="0.5" oninput="App.calcUpdate()">
+              </div>
+            </div>
+          </div>
+
+          <!-- العمالة والإضافات -->
+          <div class="calc-panel">
+            <div class="calc-section-title">🔧 العمالة والتجهيز والملحقات</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">ساعات العمل اليدوي (Labor)</label>
+                <input type="number" id="calc-labor-hours" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">سعر ساعة العمل (ج.م)</label>
+                <input type="number" id="calc-labor-rate" class="form-control" value="50" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">تكلفة الملحقات (مغناطيس، مسامير...) ج.م</label>
+                <input type="number" id="calc-hardware" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">تكلفة التشطيب والدهان (ج.م)</label>
+                <input type="number" id="calc-postprocess" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">تغليف وملصقات (ج.م)</label>
+                <input type="number" id="calc-packaging" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">شحن وتوصيل (ج.م)</label>
+                <input type="number" id="calc-shipping" class="form-control" value="0" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">هامش الربح المستهدف (%)</label>
+                <input type="number" id="calc-margin" class="form-control" value="40" min="1" max="95" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">حد أدنى لسعر الطلب (ج.م)</label>
+                <input type="number" id="calc-min-price" class="form-control" value="100" oninput="App.calcUpdate()">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- نتائج الحاسبة -->
+        <div class="calc-result-card">
+          <div class="calc-result-header">
+            <h3>💡 نتيجة التسعير الفوري</h3>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:2px">سعر بيع القطعة الواحدة</p>
+            <div class="calc-result-price"><span class="currency">ج.م</span><span id="calc-out-price">0.00</span></div>
+          </div>
+          <div class="calc-result-body">
+            <div class="calc-result-row">
+              <span class="r-label">🧵 تكلفة الخامة</span>
+              <span class="r-value" id="calc-out-material">0 ج.م</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">⚡ تكلفة الكهرباء</span>
+              <span class="r-value" id="calc-out-power">0 ج.م</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">🔩 إهلاك الطابعة</span>
+              <span class="r-value" id="calc-out-deprec">0 ج.م</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">🔧 صيانة ومستهلكات</span>
+              <span class="r-value" id="calc-out-consumables">0 ج.م</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">👷 عمالة وتشطيب</span>
+              <span class="r-value" id="calc-out-labor">0 ج.م</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">📦 تغليف وملحقات</span>
+              <span class="r-value" id="calc-out-extras">0 ج.م</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">⚠️ احتياطي الفشل</span>
+              <span class="r-value" id="calc-out-failure">0 ج.م</span>
+            </div>
+            <div class="divider"></div>
+            <div class="calc-result-row r-total">
+              <span class="r-label">💰 إجمالي التكلفة</span>
+              <span class="r-value" id="calc-out-total-cost">0 ج.م</span>
+            </div>
+            <div class="calc-result-row r-margin">
+              <span class="r-label">📈 هامش الربح المحقق</span>
+              <span class="r-value" id="calc-out-margin">0%</span>
+            </div>
+            <div class="calc-result-row" style="color:var(--green)">
+              <span class="r-label">💵 صافي الربح للقطعة</span>
+              <span class="r-value" id="calc-out-profit">0 ج.م</span>
+            </div>
+            <div class="divider"></div>
+            <div class="calc-result-row r-total">
+              <span class="r-label">📋 إجمالي الطلبية (<span id="calc-out-qty-label">×1</span>)</span>
+              <span class="r-value" id="calc-out-batch">0 ج.م</span>
+            </div>
+          </div>
+          <div class="calc-result-footer">
+            <div style="display:flex; gap:8px; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); padding-bottom:8px; border-bottom:1px solid var(--border)">
+              <span>تكلفة/جرام: <strong id="calc-out-per-gram" style="color:var(--text-primary)">0</strong></span>
+              <span>تكلفة/ساعة: <strong id="calc-out-per-hour" style="color:var(--text-primary)">0</strong></span>
+              <span>Markup: <strong id="calc-out-markup" style="color:var(--accent-2)">0%</strong></span>
+            </div>
+            <button class="btn btn-success btn-full" onclick="App.calcSaveAsQuote()">📑 حفظ كعرض سعر رسمي</button>
+            <button class="btn btn-secondary btn-full btn-sm" onclick="App.calcCopyWhatsapp()">📱 نسخ كرسالة واتساب للعميل</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- نوافذ Modal التفاعلية -->
@@ -866,6 +1079,7 @@
   <script src="js/modules/customers.js"></script>
   <script src="js/modules/printer.js"></script>
   <script src="js/modules/dashboard.js"></script>
+  <script src="js/modules/calculator.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

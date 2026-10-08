@@ -23,6 +23,7 @@
       this.populateSelects();
       this.renderCurrentTab();
       this.subscribeEvents();
+      this.initCalculator();
       console.log('ELMALHY.3D Workshop Manager initialized successfully.');
     },
 
@@ -52,6 +53,9 @@
       switch (this.currentTab) {
         case 'dashboard':
           this.renderDashboard();
+          break;
+        case 'calculator':
+          this.calcUpdate();
           break;
         case 'orders':
           this.renderOrders();
@@ -768,6 +772,185 @@
     closeModal(id) {
       const modal = document.getElementById(id);
       if (modal) modal.classList.remove('active');
+    },
+
+    // ===== CALCULATOR INTEGRATED METHODS =====
+    initCalculator() {
+      const defaults = root.WorkshopCalculator
+        ? root.WorkshopCalculator.getDefaultSettings()
+        : {};
+      const powEl = document.getElementById('calc-power');
+      const elecEl = document.getElementById('calc-elec-rate');
+      const consEl = document.getElementById('calc-consumables');
+      const margEl = document.getElementById('calc-margin');
+      const depEl = document.getElementById('calc-deprec');
+
+      if (powEl && defaults.printerPowerKw) powEl.value = defaults.printerPowerKw;
+      if (elecEl && defaults.electricityRate) elecEl.value = defaults.electricityRate;
+      if (consEl && defaults.consumablesPerHour) consEl.value = defaults.consumablesPerHour;
+      if (margEl && defaults.defaultMarginPercent) margEl.value = defaults.defaultMarginPercent;
+      if (depEl) {
+        const depPerHour = ((defaults.printerPrice || 22000) / (defaults.printerLifespanHours || 6000));
+        depEl.value = Math.round(depPerHour * 100) / 100;
+      }
+      this.calcUpdate();
+    },
+
+    onCalcMaterialChange() {
+      const matSel = document.getElementById('calc-material');
+      if (!matSel) return;
+      const opt = matSel.options[matSel.selectedIndex];
+      const defaultSpool = opt ? opt.getAttribute('data-spool') : null;
+      if (defaultSpool) {
+        document.getElementById('calc-spool-price').value = defaultSpool;
+      }
+      this.calcUpdate();
+    },
+
+    calcUpdate() {
+      const CalcEngine = root.WorkshopCalc;
+      if (!CalcEngine) return;
+
+      const weightEl = document.getElementById('calc-weight');
+      if (!weightEl) return;
+
+      const params = {
+        partWeight: Number(weightEl.value) || 0,
+        printHours: Number(document.getElementById('calc-hours').value) || 0,
+        quantity: Math.max(1, Number(document.getElementById('calc-qty').value) || 1),
+        spoolPrice: Number(document.getElementById('calc-spool-price').value) || 700,
+        spoolWeight: 1000,
+        printerPowerKw: Number(document.getElementById('calc-power').value) || 0.22,
+        electricityRate: Number(document.getElementById('calc-elec-rate').value) || 2.5,
+        printerPrice: 0,
+        printerLifespanHours: 1,
+        consumablesPerHour: Number(document.getElementById('calc-consumables').value) || 5,
+        laborHours: Number(document.getElementById('calc-labor-hours').value) || 0,
+        laborRatePerHour: Number(document.getElementById('calc-labor-rate').value) || 50,
+        hardwareCost: Number(document.getElementById('calc-hardware').value) || 0,
+        postProcessCost: Number(document.getElementById('calc-postprocess').value) || 0,
+        packagingCost: Number(document.getElementById('calc-packaging').value) || 0,
+        shippingFee: Number(document.getElementById('calc-shipping').value) || 0,
+        profitMarginPercent: Number(document.getElementById('calc-margin').value) || 40,
+        failureRatePercent: Number(document.getElementById('calc-failure').value) || 5,
+        minOrderPrice: Number(document.getElementById('calc-min-price').value) || 0,
+      };
+
+      const deprecPerHour = Number(document.getElementById('calc-deprec').value) || 0;
+      params.consumablesPerHour = (Number(document.getElementById('calc-consumables').value) || 5) + deprecPerHour;
+
+      const res = CalcEngine.calculateCost(params);
+      const qty = params.quantity;
+
+      const fmt = (v) => (Math.round((v || 0) * 100) / 100).toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+      const outPrice = document.getElementById('calc-out-price');
+      if (outPrice) outPrice.textContent = fmt(res.finalUnitPrice);
+
+      const outMat = document.getElementById('calc-out-material');
+      if (outMat) outMat.textContent = fmt(res.materialCost) + ' ج.م';
+
+      const outPow = document.getElementById('calc-out-power');
+      if (outPow) outPow.textContent = fmt(res.powerCost) + ' ج.م';
+
+      const outDep = document.getElementById('calc-out-deprec');
+      if (outDep) outDep.textContent = fmt(deprecPerHour * params.printHours) + ' ج.م';
+
+      const outCons = document.getElementById('calc-out-consumables');
+      if (outCons) outCons.textContent = fmt((Number(document.getElementById('calc-consumables').value) || 5) * params.printHours) + ' ج.م';
+
+      const outLab = document.getElementById('calc-out-labor');
+      if (outLab) outLab.textContent = fmt(res.laborCost + res.postProcessCost) + ' ج.م';
+
+      const outExt = document.getElementById('calc-out-extras');
+      if (outExt) outExt.textContent = fmt(res.hardwareCost + res.packagingCost) + ' ج.م';
+
+      const outFail = document.getElementById('calc-out-failure');
+      if (outFail) outFail.textContent = fmt(res.failureCost) + ' ج.م';
+
+      const outTotal = document.getElementById('calc-out-total-cost');
+      if (outTotal) outTotal.textContent = fmt(res.totalUnitCost) + ' ج.م';
+
+      const outMarg = document.getElementById('calc-out-margin');
+      if (outMarg) outMarg.textContent = res.actualMarginPercent + '%';
+
+      const outProf = document.getElementById('calc-out-profit');
+      if (outProf) outProf.textContent = fmt(res.unitProfit) + ' ج.م';
+
+      const outQtyLbl = document.getElementById('calc-out-qty-label');
+      if (outQtyLbl) outQtyLbl.textContent = '×' + qty;
+
+      const outBatch = document.getElementById('calc-out-batch');
+      if (outBatch) outBatch.textContent = fmt(res.batchTotalPrice) + ' ج.م';
+
+      const outGram = document.getElementById('calc-out-per-gram');
+      if (outGram) outGram.textContent = res.partWeight > 0 ? fmt(res.totalUnitCost / res.partWeight) : '0';
+
+      const outHour = document.getElementById('calc-out-per-hour');
+      if (outHour) outHour.textContent = res.printHours > 0 ? fmt(res.totalUnitCost / res.printHours) : '0';
+
+      const outMark = document.getElementById('calc-out-markup');
+      if (outMark) outMark.textContent = res.markupPercent + '%';
+
+      this._lastCalcResult = res;
+    },
+
+    calcConvertLength() {
+      const CalcMod = root.WorkshopCalculator;
+      if (!CalcMod) return;
+      const lenMm = Number(document.getElementById('calc-length-mm').value) || 0;
+      if (!lenMm) return;
+      const diamMm = Number(document.getElementById('calc-diameter').value) || 1.75;
+      const matId = document.getElementById('calc-material').value;
+      const wg = CalcMod.convertFilamentLength(lenMm, diamMm, matId);
+      document.getElementById('calc-weight').value = wg;
+      this.calcUpdate();
+    },
+
+    calcReset() {
+      document.getElementById('calc-weight').value = 50;
+      document.getElementById('calc-hours').value = 2.5;
+      document.getElementById('calc-qty').value = 1;
+      document.getElementById('calc-spool-price').value = 700;
+      document.getElementById('calc-labor-hours').value = 0;
+      document.getElementById('calc-hardware').value = 0;
+      document.getElementById('calc-postprocess').value = 0;
+      document.getElementById('calc-packaging').value = 0;
+      document.getElementById('calc-shipping').value = 0;
+      const lenEl = document.getElementById('calc-length-mm');
+      if (lenEl) lenEl.value = '';
+      this.calcUpdate();
+    },
+
+    calcSaveAsQuote() {
+      if (!this._lastCalcResult) { this.calcUpdate(); }
+      const r = this._lastCalcResult;
+      if (!r) return;
+      document.getElementById('order-is-quote').value = 'true';
+      document.getElementById('modal-order-title').textContent = 'إنشاء عرض سعر من الحاسبة';
+      document.getElementById('order-item-name').value = 'قطعة مخصصة';
+      document.getElementById('order-item-weight').value = r.partWeight;
+      document.getElementById('order-item-hours').value = r.printHours;
+      document.getElementById('order-item-qty').value = r.quantity;
+      document.getElementById('order-margin-pct').value = r.actualMarginPercent;
+      this.openModal('modal-order');
+      this.recalcOrderModal();
+    },
+
+    calcCopyWhatsapp() {
+      if (!this._lastCalcResult) this.calcUpdate();
+      const r = this._lastCalcResult;
+      if (!r) return;
+      const text = `🖨️ *ELMALHY.3D — عرض سعر قطعة طباعة ثلاثية الأبعاد*\n\nالوزن: ${r.partWeight} جرام | وقت الطباعة: ${r.printHours} ساعة\n💰 سعر القطعة: ${r.finalUnitPrice} ج.م\n📦 إجمالي الطلبية (الكمية ×${r.quantity}): ${r.batchTotalPrice} ج.م\n\nللطلب والاستفسار يرجى الرد على هذه الرسالة 🤝`;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(() => {
+          alert('تم نسخ رسالة الواتساب بنجاح! يمكنك لصقها الآن في المحادثة.');
+        }).catch(() => {
+          prompt('انسخ الرسالة التالية:', text);
+        });
+      } else {
+        prompt('انسخ الرسالة التالية:', text);
+      }
     }
   };
 
