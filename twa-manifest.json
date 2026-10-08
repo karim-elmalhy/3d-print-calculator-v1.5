@@ -1,0 +1,18 @@
+{
+  "packageId": "com.karimelmalhy.print3dcalculator",
+  "host": "karim-elmalhy.github.io",
+  "name": "3D Print Calculator Pro",
+  "launcherName": "3D Calc Pro",
+  "display": "standalone",
+  "themeColor": "#2563eb",
+  "navigationColor": "#0f172a",
+  "backgroundColor": "#0f172a",
+  "enableNotifications": false,
+  "startUrl": "/3d-print-calculator/",
+  "iconUrl": "https://karim-elmalhy.github.io/3d-print-calculator/icons/icon-512.png",
+  "appVersionName": "1.0.0",
+  "appVersionCode": 1,
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://karim-elmalhy.github.io/3d-print-calculator/manifest.json",
+  "fallbackType": "customtabs"
+}

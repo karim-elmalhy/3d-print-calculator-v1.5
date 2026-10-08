@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>اطلب قطعتك ثلاثية الأبعاد</title>
+<link rel="apple-touch-icon" href="icons/icon-192.png">
+<script src="https://cdn.tailwindcss.com"></script>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+<style>body{font-family:'Segoe UI',Tahoma,sans-serif}</style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col items-center py-6 px-4">
+
+  <div class="w-full max-w-md">
+    <div class="text-center mb-5">
+      <div class="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-blue-600 text-white text-2xl mb-2">
+        <i class="fas fa-cube"></i>
+      </div>
+      <h1 class="text-lg font-black text-slate-800">اطلب قطعتك ثلاثية الأبعاد</h1>
+      <p class="text-xs text-slate-500">طباعة 3D احترافية — استلم عرض السعر خلال دقائق</p>
+    </div>
+
+    <!-- Mode Switch -->
+    <div class="flex bg-white rounded-xl p-1 shadow-sm mb-4 text-sm font-bold">
+      <button id="btnModeNew" onclick="setMode('new')" class="flex-1 py-2 rounded-lg bg-blue-600 text-white transition">📝 طلب جديد</button>
+      <button id="btnModeTrack" onclick="setMode('track')" class="flex-1 py-2 rounded-lg text-slate-500 transition">🔍 تابع طلبك</button>
+    </div>
+
+    <!-- ============ NEW ORDER FORM ============ -->
+    <div id="panelNew" class="bg-white rounded-2xl shadow-md p-5 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">اسم القطعة *</label>
+        <input id="f_partName" type="text" placeholder="مثال: حامل موبايل" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">اسمك *</label>
+        <input id="f_clientName" type="text" placeholder="اسمك بالكامل" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">رقم الهاتف / واتساب *</label>
+        <input id="f_phone" type="tel" placeholder="01xxxxxxxxx" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">رفع ملف الموديل (اختياري)</label>
+        <p class="text-[11px] text-slate-400 mb-1.5">لو معاك ملف G-code هتاخد السعر فورًا. لو معاك STL بس، الطلب هيتراجع ويتحدد سعره يدويًا.</p>
+        <input id="f_file" type="file" accept=".stl,.gcode,.gco,.g,.nc" class="w-full text-xs file:ml-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:text-xs file:font-bold">
+        <div id="fileAnalysisBox" class="hidden mt-2 p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800"></div>
+      </div>
+
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">ملاحظات إضافية (اختياري)</label>
+        <textarea id="f_notes" rows="2" placeholder="اللون المطلوب، الكمية، أي تفاصيل..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm"></textarea>
+      </div>
+
+      <button id="btnSubmit" onclick="submitOrder()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition">
+        <i class="fas fa-paper-plane"></i> إرسال الطلب
+      </button>
+    </div>
+
+    <!-- ============ CONFIRMATION SCREEN ============ -->
+    <div id="panelConfirm" class="hidden bg-white rounded-2xl shadow-md p-6 text-center space-y-3">
+      <div class="text-4xl">✅</div>
+      <h2 class="font-black text-base text-slate-800">تم استلام طلبك بنجاح!</h2>
+      <div id="confirmPriceBox" class="hidden p-3 rounded-xl bg-emerald-50 border border-emerald-200">
+        <div class="text-xs text-slate-500">السعر التقديري</div>
+        <div id="confirmPrice" class="text-2xl font-black text-emerald-700"></div>
+      </div>
+      <div id="confirmPendingBox" class="hidden p-3 rounded-xl bg-amber-50 border border-amber-200 text-xs text-amber-800">
+        هنراجع طلبك ونحدد السعر ونتواصل معاك في أقرب وقت.
+      </div>
+      <div class="p-3 rounded-xl bg-slate-50 border border-slate-200">
+        <div class="text-xs text-slate-500 mb-1">كود متابعة طلبك — احتفظ بيه</div>
+        <div id="confirmCode" class="text-2xl font-black tracking-widest text-blue-700 font-mono"></div>
+      </div>
+      <button onclick="location.reload()" class="w-full bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl transition text-sm">إرسال طلب آخر</button>
+    </div>
+
+    <!-- ============ TRACK ORDER ============ -->
+    <div id="panelTrack" class="hidden bg-white rounded-2xl shadow-md p-5 space-y-4">
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">كود المتابعة</label>
+        <input id="t_code" type="text" placeholder="مثال: A3F7K9X2" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm font-mono tracking-widest text-center uppercase">
+      </div>
+      <div>
+        <label class="block text-xs font-bold text-slate-600 mb-1">رقم الهاتف المسجل بيه الطلب</label>
+        <input id="t_phone" type="tel" placeholder="01xxxxxxxxx" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-lg text-sm">
+      </div>
+      <button onclick="trackOrder()" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition">
+        <i class="fas fa-magnifying-glass"></i> تحقق من الحالة
+      </button>
+      <div id="trackResult" class="hidden"></div>
+    </div>
+
+    <p class="text-center text-[11px] text-slate-400 mt-5">مدعوم بـ حاسبة 3D Pro مصر</p>
+  </div>
+
+<script>
+// ================= CONFIG =================
+// حط هنا رابط الـ Web App اللي طلع بعد نشر Google Apps Script
+const esc = v => String(v == null ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const APPS_SCRIPT_URL = 'PASTE_YOUR_DEPLOYED_WEB_APP_URL_HERE';
+// ============================================
+
+let extractedFileData = null; // { fileType, fileName, base64, weight, hours }
+const MAX_FILE_MB = 15;
+
+function setMode(mode) {
+  document.getElementById('panelNew').classList.toggle('hidden', mode !== 'new');
+  document.getElementById('panelTrack').classList.toggle('hidden', mode !== 'track');
+  document.getElementById('panelConfirm').classList.add('hidden');
+  document.getElementById('btnModeNew').className = 'flex-1 py-2 rounded-lg transition ' + (mode === 'new' ? 'bg-blue-600 text-white font-bold' : 'text-slate-500 font-bold');
+  document.getElementById('btnModeTrack').className = 'flex-1 py-2 rounded-lg transition ' + (mode === 'track' ? 'bg-blue-600 text-white font-bold' : 'text-slate-500 font-bold');
+}
+
+function toBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(',')[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// ---- G-code parsing (same patterns used in the main calculator) ----
+function parseGCodeText(text) {
+  let printTimeSeconds = 0;
+  let filamentGrams = 0;
+
+  const mG = text.match(/;\s*(?:total\s+)?filament\s+used\s*\[g\]\s*=\s*([\d.]+)/i) ||
+             text.match(/;\s*filament_used_g\s*=\s*([\d.]+)/i) ||
+             text.match(/;\s*(?:total_)?filament_weight\s*[:=]\s*([\d.]+)/i) ||
+             text.match(/;\s*material_weight\s*[:=]\s*([\d.]+)/i) ||
+             text.match(/;\s*Filament used:\s*([\d.]+)\s*g/i) ||
+             text.match(/;\s*Filament used:\s*([\d.]+)\s*grams/i) ||
+             text.match(/;\s*Filament weight\s*[:=]\s*([\d.]+)\s*g/i);
+
+  if (mG) {
+    filamentGrams = parseFloat(mG[1]);
+  } else {
+    const mCm3 = text.match(/;\s*filament\s+used\s*\[cm3\]\s*=\s*([\d.]+)/i) ||
+                 text.match(/;\s*Filament volume\s*[:=]\s*([\d.]+)\s*cm3/i);
+    if (mCm3) {
+      filamentGrams = parseFloat(mCm3[1]) * 1.24; // كثافة PLA تقريبية
+    } else {
+      const mM = text.match(/;\s*Filament used:\s*([\d.]+)\s*m\b/i) ||
+                 text.match(/;\s*Filament length\s*[:=]\s*([\d.]+)\s*m\b/i);
+      if (mM) {
+        filamentGrams = parseFloat(mM[1]) * 2.98;
+      } else {
+        const mMm = text.match(/;\s*(?:total\s+)?filament\s+used\s*\[mm\]\s*=\s*([\d.]+)/i) ||
+                    text.match(/;\s*Filament used:\s*([\d.]+)\s*mm\b/i) ||
+                    text.match(/;\s*Filament length\s*[:=]\s*([\d.]+)\s*mm\b/i);
+        if (mMm) filamentGrams = (parseFloat(mMm[1]) / 1000.0) * 2.98;
+      }
+    }
+  }
+
+  const mSec = text.match(/;\s*(?:TIME|print_time|PRINT\.TIME|TIME_ELAPSED)\s*:\s*(\d+)/i) ||
+               text.match(/;\s*estimated printing time[^=]*=\s*(\d+)\s*s/i);
+  if (mSec) {
+    printTimeSeconds = parseInt(mSec[1], 10);
+  } else {
+    const mStr = text.match(/;\s*(?:estimated printing time|model printing time|total estimated time|Build time|Print time)[^=:]*[=:]\s*([^\n\r]+)/i);
+    if (mStr) {
+      const raw = mStr[1];
+      let h = 0, m = 0, s = 0;
+      const hM = raw.match(/(\d+)\s*(?:h|hour|hours)/i);
+      const mM = raw.match(/(\d+)\s*(?:m|min|minute|minutes)/i);
+      const sM = raw.match(/(\d+)\s*(?:s|sec|second|seconds)/i);
+      if (hM) h = parseInt(hM[1], 10);
+      if (mM) m = parseInt(mM[1], 10);
+      if (sM) s = parseInt(sM[1], 10);
+      printTimeSeconds = h * 3600 + m * 60 + s;
+    }
+  }
+
+  return { weight: Number(filamentGrams.toFixed(1)), hours: Number((printTimeSeconds / 3600).toFixed(2)) };
+}
+
+// ---- STL volume/weight estimate (manual parser, no external library needed) ----
+function parseSTLBuffer(buffer) {
+  const isBinary = buffer.byteLength >= 84 &&
+    buffer.byteLength === 84 + new DataView(buffer).getUint32(80, true) * 50;
+
+  const positions = [];
+  if (isBinary) {
+    const view = new DataView(buffer);
+    const numTriangles = view.getUint32(80, true);
+    let offset = 84;
+    for (let i = 0; i < numTriangles; i++) {
+      offset += 12; // skip normal
+      for (let j = 0; j < 3; j++) {
+        positions.push(view.getFloat32(offset, true), view.getFloat32(offset + 4, true), view.getFloat32(offset + 8, true));
+        offset += 12;
+      }
+      offset += 2;
+    }
+  } else {
+    const text = new TextDecoder().decode(buffer);
+    const vMatches = [...text.matchAll(/vertex\s+([-\d.eE+]+)\s+([-\d.eE+]+)\s+([-\d.eE+]+)/gi)];
+    for (const m of vMatches) positions.push(parseFloat(m[1]), parseFloat(m[2]), parseFloat(m[3]));
+  }
+
+  let volume = 0;
+  for (let i = 0; i < positions.length; i += 9) {
+    const x1 = positions[i], y1 = positions[i + 1], z1 = positions[i + 2];
+    const x2 = positions[i + 3], y2 = positions[i + 4], z2 = positions[i + 5];
+    const x3 = positions[i + 6], y3 = positions[i + 7], z3 = positions[i + 8];
+    volume += (x1 * (y2 * z3 - z2 * y3) - y1 * (x2 * z3 - z2 * x3) + z1 * (x2 * y3 - y2 * x3)) / 6.0;
+  }
+  const volumeCm3 = Math.abs(volume) / 1000.0;
+  const density = 1.24; // PLA تقريبية
+  const infillRatio = (20 / 100) * 0.45 + 0.25; // افتراض إنفيل 20%
+  const estimatedGrams = Math.max(1, Math.round(volumeCm3 * density * infillRatio));
+  return { volumeCm3, estimatedGrams };
+}
+
+document.getElementById('f_file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  const box = document.getElementById('fileAnalysisBox');
+  extractedFileData = null;
+  if (!file) { box.classList.add('hidden'); return; }
+
+  if (file.size > MAX_FILE_MB * 1024 * 1024) {
+    box.classList.remove('hidden');
+    box.className = 'mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700';
+    box.innerHTML = `❌ حجم الملف أكبر من ${MAX_FILE_MB} ميجا. جرب ترفعه لاحقًا عن طريق الأدمن مباشرة.`;
+    e.target.value = '';
+    return;
+  }
+
+  const name = file.name.toLowerCase();
+  const isGcode = /\.(gcode|gco|g|nc)$/i.test(name);
+  const isStl = /\.stl$/i.test(name);
+
+  box.classList.remove('hidden');
+  box.className = 'mt-2 p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800';
+  box.innerHTML = '⏳ جاري تحليل الملف...';
+
+  try {
+    const base64 = await toBase64(file);
+
+    if (isGcode) {
+      const text = await file.text();
+      const { weight, hours } = parseGCodeText(text);
+      extractedFileData = { fileType: 'gcode', fileName: file.name, base64, weight, hours };
+      if (weight > 0 && hours > 0) {
+        box.innerHTML = `⚡ تم تحليل الـ G-code: <b>${weight} جم</b> • <b>${hours} ساعة</b><br>هيتحدد سعرك النهائي فورًا بعد الإرسال.`;
+      } else {
+        box.innerHTML = `⚠️ اتفتح الملف بس مقدرناش نطلع بيانات دقيقة منه. الطلب هيتحول لمراجعة يدوية.`;
+        extractedFileData.fileType = 'gcode_unclear';
+      }
+    } else if (isStl) {
+      const buffer = await file.arrayBuffer();
+      const { volumeCm3, estimatedGrams } = parseSTLBuffer(buffer);
+      extractedFileData = { fileType: 'stl', fileName: file.name, base64, weight: estimatedGrams, hours: 0 };
+      box.innerHTML = `🧊 حجم القطعة: ${volumeCm3.toFixed(1)} سم³ — وزن تقريبي: <b>${estimatedGrams} جم</b><br>السعر النهائي هيتحدد بعد المراجعة اليدوية.`;
+    } else {
+      box.className = 'mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700';
+      box.innerHTML = '❌ نوع الملف غير مدعوم. استخدم STL أو G-code.';
+      e.target.value = '';
+    }
+  } catch (err) {
+    box.className = 'mt-2 p-2.5 rounded-lg bg-rose-50 border border-rose-200 text-xs text-rose-700';
+    box.innerHTML = '❌ حدث خطأ أثناء قراءة الملف.';
+  }
+});
+
+async function submitOrder() {
+  const partName = document.getElementById('f_partName').value.trim();
+  const clientName = document.getElementById('f_clientName').value.trim();
+  const phone = document.getElementById('f_phone').value.trim();
+  const notes = document.getElementById('f_notes').value.trim();
+
+  if (!partName || !clientName || !phone) {
+    alert('من فضلك املأ اسم القطعة، اسمك، ورقم الهاتف.');
+    return;
+  }
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_YOUR')) {
+    alert('الموقع لسه مش متوصل بقاعدة البيانات. كلم صاحب المتجر.');
+    return;
+  }
+
+  const btn = document.getElementById('btnSubmit');
+  btn.disabled = true;
+  btn.innerHTML = '⏳ جاري الإرسال...';
+
+  const payload = {
+    action: 'submit',
+    partName, clientName, phone, notes,
+    fileType: extractedFileData ? extractedFileData.fileType : 'none',
+    fileName: extractedFileData ? extractedFileData.fileName : '',
+    fileData: extractedFileData ? extractedFileData.base64 : '',
+    weight: extractedFileData ? extractedFileData.weight : 0,
+    hours: extractedFileData ? extractedFileData.hours : 0
+  };
+
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+
+    if (!data.success) {
+      alert('حصل خطأ: ' + (data.error || 'غير معروف'));
+      btn.disabled = false;
+      btn.innerHTML = '<i class="fas fa-paper-plane"></i> إرسال الطلب';
+      return;
+    }
+
+    document.getElementById('panelNew').classList.add('hidden');
+    document.getElementById('panelConfirm').classList.remove('hidden');
+    document.getElementById('confirmCode').textContent = data.trackingCode;
+
+    if (data.status === 'priced' && data.autoPrice) {
+      document.getElementById('confirmPriceBox').classList.remove('hidden');
+      document.getElementById('confirmPrice').textContent = data.autoPrice + ' ج.م';
+    } else {
+      document.getElementById('confirmPendingBox').classList.remove('hidden');
+    }
+  } catch (err) {
+    alert('تعذر الاتصال بالخادم. حاول تاني.');
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fas fa-paper-plane"></i> إرسال الطلب';
+  }
+}
+
+const STATUS_LABELS = {
+  pending_review: '⏳ قيد المراجعة',
+  priced: '💰 تم تحديد السعر — في انتظار تأكيدك',
+  printing: '🖨️ جاري الطباعة',
+  ready: '📦 جاهز للاستلام / الشحن',
+  delivered: '✅ تم التسليم',
+  rejected: '❌ تم رفض الطلب'
+};
+
+async function trackOrder() {
+  const code = document.getElementById('t_code').value.trim().toUpperCase();
+  const phone = document.getElementById('t_phone').value.trim();
+  const resultBox = document.getElementById('trackResult');
+
+  if (!code || !phone) {
+    alert('من فضلك أدخل كود المتابعة (8 حروف) ورقم الهاتف كاملاً.');
+    return;
+  }
+  if (!APPS_SCRIPT_URL || APPS_SCRIPT_URL.includes('PASTE_YOUR')) {
+    alert('الموقع لسه مش متوصل بقاعدة البيانات. كلم صاحب المتجر.');
+    return;
+  }
+
+  resultBox.classList.remove('hidden');
+  resultBox.innerHTML = '<div class="text-center text-xs text-slate-400 py-3">⏳ جاري البحث...</div>';
+
+  try {
+    const url = `${APPS_SCRIPT_URL}?action=track&code=${encodeURIComponent(code)}&phone=${encodeURIComponent(phone)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+
+    if (!data.success) {
+      resultBox.innerHTML = `<div class="text-center text-xs text-rose-600 py-3">${esc(data.error || 'لم يتم العثور على الطلب')}</div>`;
+      return;
+    }
+
+    const o = data.order;
+    const statusLabel = STATUS_LABELS[o.Status] || o.Status;
+    const price = o.FinalPrice || o.AutoPrice || '';
+
+    resultBox.innerHTML = `
+      <div class="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-2 text-sm">
+        <div class="flex justify-between"><span class="text-slate-500">القطعة</span><span class="font-bold">${esc(o.PartName)}</span></div>
+        <div class="flex justify-between"><span class="text-slate-500">الحالة</span><span class="font-bold">${esc(statusLabel)}</span></div>
+        ${price ? `<div class="flex justify-between"><span class="text-slate-500">السعر</span><span class="font-bold text-emerald-700">${esc(price)} ج.م</span></div>` : ''}
+        ${o.CustomerNote ? `<div class="pt-2 border-t border-slate-200 text-xs text-slate-500">ملاحظات: ${esc(o.CustomerNote)}</div>` : ''}
+      </div>
+    `;
+  } catch (err) {
+    resultBox.innerHTML = '<div class="text-center text-xs text-rose-600 py-3">تعذر الاتصال بالخادم.</div>';
+  }
+}
+try { const c = new URLSearchParams(location.search).get('code'); const el = document.getElementById('t_code'); if (c && el) el.value = c.toUpperCase().slice(0, 12); } catch (e) {}
+</script>
+</body>
+</html>

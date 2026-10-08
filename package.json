@@ -1,0 +1,2 @@
+{ "name": "3d-print-calculator-pro", "version": "2.0.0", "private": true,
+  "scripts": { "test": "node --test tests/calc.test.js tests/reports.test.js" } }
