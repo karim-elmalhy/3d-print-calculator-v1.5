@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ELMALHY.3D — Workshop Manager</title>
+  <link rel="stylesheet" href="css/workshop.css">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2226%22 font-size=%2226%22>🖨️</text></svg>">
+</head>
+<body>
+
+  <!-- القائمة الجانبية -->
+  <aside class="sidebar">
+    <div class="brand-header">
+      <div class="brand-logo">🏭</div>
+      <div>
+        <div class="brand-title">ELMALHY.3D</div>
+        <div class="brand-subtitle">Workshop Manager v2.0</div>
+      </div>
+    </div>
+
+    <ul class="nav-menu">
+      <li class="nav-item active" data-tab="dashboard">
+        <button><span class="nav-icon">📊</span><span>لوحة التحكم</span></button>
+      </li>
+      <li class="nav-item" data-tab="orders">
+        <button><span class="nav-icon">📦</span><span>مسار الطلبات والإنتاج</span></button>
+      </li>
+      <li class="nav-item" data-tab="quotations">
+        <button><span class="nav-icon">📑</span><span>عروض الأسعار</span></button>
+      </li>
+      <li class="nav-item" data-tab="inventory">
+        <button>
+          <span class="nav-icon">🧵</span>
+          <span>المخزون المتكامل</span>
+          <span class="nav-badge" id="sidebar-stock-alert-badge" style="display: none;">0</span>
+        </button>
+      </li>
+      <li class="nav-item" data-tab="products">
+        <button><span class="nav-icon">🏷️</span><span>كتالوج المنتجات (SKU)</span></button>
+      </li>
+      <li class="nav-item" data-tab="customers">
+        <button><span class="nav-icon">👥</span><span>العملاء والحسابات</span></button>
+      </li>
+      <li class="nav-item" data-tab="printer">
+        <button><span class="nav-icon">⚙️</span><span>طابعة Neptune 4 Pro</span></button>
+      </li>
+      <li class="nav-item" data-tab="backup">
+        <button><span class="nav-icon">💾</span><span>النسخ الاحتياطي</span></button>
+      </li>
+    </ul>
+
+    <div class="sidebar-footer">
+      <span>الحالة: <strong style="color: var(--accent-green)">أوفلاين / محلي</strong></span>
+      <span id="active-printer-status">🖨️ جاهزة</span>
+    </div>
+  </aside>
+
+  <!-- المحتوى الرئيسي -->
+  <main class="main-content">
+    
+    <!-- 1. تبويب لوحة التحكم -->
+    <section id="tab-dashboard" class="tab-pane active">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>لوحة التحكم الإدارية</h1>
+          <p>مؤشرات الأداء المالي، استغلال الطابعة، وسلامة العمليات في ورشة ELMALHY.3D</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.openNewOrderModal(true)">+ عرض سعر جديد</button>
+          <button class="btn btn-success" onclick="App.openNewOrderModal(false)">+ طلب إنتاج مباشر</button>
+        </div>
+      </div>
+
+      <!-- تنبيهات انخفاض المخزون -->
+      <div id="dashboard-stock-alerts-container"></div>
+
+      <!-- شبكة المؤشرات المالية والتشغيلية -->
+      <div class="kpi-grid">
+        <div class="kpi-card">
+          <span class="kpi-icon">💰</span>
+          <div class="kpi-title">إجمالي المبيعات المؤكدة</div>
+          <div class="kpi-value" id="kpi-total-sales">0 ج.م</div>
+          <div class="kpi-subtext" id="kpi-sales-sub">الطلبات المؤكدة والمنفذة</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">📈</span>
+          <div class="kpi-title">صافي الأرباح المحققة</div>
+          <div class="kpi-value" id="kpi-net-profits" style="color: var(--accent-green);">0 ج.م</div>
+          <div class="kpi-subtext" id="kpi-margin-rate">هامش ربح: 0%</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">⏱️</span>
+          <div class="kpi-title">ربح كل ساعة تشغيل للطابعة</div>
+          <div class="kpi-value" id="kpi-profit-per-hour" style="color: var(--accent-cyan);">0 ج.م/س</div>
+          <div class="kpi-subtext" id="kpi-hourly-cost-info">تكلفة التشغيل: 9.22 ج.م/س</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">📉</span>
+          <div class="kpi-title">معدل فشل الطباعة</div>
+          <div class="kpi-value" id="kpi-failure-rate">0%</div>
+          <div class="kpi-subtext" id="kpi-utilization-rate">استغلال الماكينة: 0%</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">⏳</span>
+          <div class="kpi-title">طلبات قيد الإنتاج</div>
+          <div class="kpi-value" id="kpi-active-orders">0</div>
+          <div class="kpi-subtext" id="kpi-delayed-orders">طلبات متأخرة: 0</div>
+        </div>
+        <div class="kpi-card">
+          <span class="kpi-icon">💳</span>
+          <div class="kpi-title">مستحقات ومبالغ متبقية</div>
+          <div class="kpi-value" id="kpi-remaining-balance" style="color: var(--accent-orange);">0 ج.م</div>
+          <div class="kpi-subtext">مديونيات مطلوب تحصيلها</div>
+        </div>
+      </div>
+
+      <!-- أكثر المنتجات مبيعاً وربحية -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🔥 المنتجات الأكثر مبيعاً</div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>المنتج</th>
+                  <th>الكود SKU</th>
+                  <th>الكمية المباعة</th>
+                  <th>الإيراد</th>
+                </tr>
+              </thead>
+              <tbody id="top-selling-table-body">
+                <tr><td colspan="4" style="text-align: center; color: var(--text-muted);">لا توجد مبيعات مسجلة بعد</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">💎 المنتجات الأكثر ربحية</div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>المنتج</th>
+                  <th>الكود SKU</th>
+                  <th>صافي الربح</th>
+                </tr>
+              </thead>
+              <tbody id="most-profitable-table-body">
+                <tr><td colspan="3" style="text-align: center; color: var(--text-muted);">لا توجد بيانات كافية</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. تبويب مسار الطلبات (11 مرحلة) والإنتاج -->
+    <section id="tab-orders" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>مسار إدارة الطلبات والإنتاج (11 مرحلة)</h1>
+          <p>تتبع رحلة الطلب من البداية وحتى التسليم مع نظام السحب والإفراج عن الخامات الآلي</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.openNewOrderModal(false)">+ إضافة طلب جديد</button>
+        </div>
+      </div>
+
+      <!-- لوحة الكانبان للمراحل الـ 11 -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📋 كانبان تدفق الإنتاج والتسليم</div>
+          <span style="font-size: 0.8rem; color: var(--accent-orange);">⚡ الخصم الآلي للخامات يتم حصراً عند مرحلة: «جاري الطباعة»</span>
+        </div>
+        <div class="kanban-board" id="orders-kanban-board">
+          <!-- تولد برمجياً من الـ 11 مرحلة -->
+        </div>
+      </div>
+
+      <!-- جدول تفصيلي للطلبات -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📑 جدول الطلبات وحالاتها</div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>كود الطلب</th>
+                <th>العميل</th>
+                <th>المنتجات والكمية</th>
+                <th>المرحلة الحالية</th>
+                <th>الإجمالي</th>
+                <th>المدفوع / المتبقي</th>
+                <th>الخامات</th>
+                <th>الإجراءات</th>
+              </tr>
+            </thead>
+            <tbody id="orders-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. تبويب عروض الأسعار -->
+    <section id="tab-quotations" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>عروض الأسعار المفتوحة (Quotations)</h1>
+          <p>عروض أسعار معتمدة لا تخصم أي خامات من المخزون حتى يتم قبولها وبدء إنتاجها</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.openNewOrderModal(true)">+ إنشاء عرض سعر رسمي</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>كود العرض</th>
+                <th>اسم العميل</th>
+                <th>الهاتف</th>
+                <th>البنود والمواصفات</th>
+                <th>القيمة المقدرة</th>
+                <th>التاريخ</th>
+                <th>الإجراء</th>
+              </tr>
+            </thead>
+            <tbody id="quotations-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. تبويب المخزون المتكامل -->
+    <section id="tab-inventory" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>إدارة المخزون المتكامل للورشة</h1>
+          <p>الفلمنت، الملحقات الهندسية، مواد التغليف، والمنتجات تامة الصنع وسجل الحركات</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.openAddInventoryModal()">+ إضافة رصيد / صنف جديد</button>
+        </div>
+      </div>
+
+      <!-- بكرات الفلمنت -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🧵 بكرات الفلمنت (Filaments)</div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم البكرة / الماركة</th>
+                <th>نوع الخامة</th>
+                <th>اللون</th>
+                <th>الوزن المتبقي</th>
+                <th>حد إعادة الطلب</th>
+                <th>سعر البكرة</th>
+                <th>الحالة</th>
+                <th>حركة سريعة</th>
+              </tr>
+            </thead>
+            <tbody id="filaments-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- الملحقات والمعدات -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">🔩 المسامير، المغناطيس، والملحقات التجميعية (Hardware)</div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم الصنف</th>
+                <th>التصنيف</th>
+                <th>الرصيد الحالي</th>
+                <th>الوحدة</th>
+                <th>تكلفة الوحدة</th>
+                <th>حد الطلب</th>
+                <th>حركة رصيد</th>
+              </tr>
+            </thead>
+            <tbody id="hardware-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- مواد التغليف والمنتجات التامة -->
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📦 مواد التغليف (Packaging)</div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>الصنف</th>
+                  <th>الرصيد</th>
+                  <th>التكلفة</th>
+                </tr>
+              </thead>
+              <tbody id="packaging-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">🎁 منتجات تامة الصنع (Ready to Ship)</div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>المنتج</th>
+                  <th>SKU</th>
+                  <th>القطع الجاهزة</th>
+                  <th>سعر البيع</th>
+                </tr>
+              </thead>
+              <tbody id="finished-goods-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- سجل حركات المخزون (Ledger) -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📜 سجل حركات المخزون الأخير (Stock Ledger)</div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>التوقيت</th>
+                <th>الصنف</th>
+                <th>نوع الحركة</th>
+                <th>الكمية</th>
+                <th>الرصيد بعد الحركة</th>
+                <th>مرجع العملية</th>
+                <th>ملاحظات</th>
+              </tr>
+            </thead>
+            <tbody id="stock-ledger-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 5. تبويب كتالوج المنتجات وSKU -->
+    <section id="tab-products" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>كتالوج المنتجات وأكواد SKU</h1>
+          <p>إدارة منتجات الديكور، الهدايا، والمستلزمات الهندسية ومواصفات الإنتاج وتسعير الجملة</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.openAddProductModal()">+ إضافة منتج جديد للكتالوج</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>كود SKU</th>
+                <th>اسم المنتج</th>
+                <th>التصنيف</th>
+                <th>سعر البيع الأساسي</th>
+                <th>الوزن المقدر</th>
+                <th>وقت الطباعة</th>
+                <th>شرائح الجملة</th>
+                <th>المستلزمات المطلوبة</th>
+              </tr>
+            </thead>
+            <tbody id="products-catalog-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 6. تبويب العملاء -->
+    <section id="tab-customers" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>سجل العملاء والحسابات</h1>
+          <p>بيانات العملاء، تاريخ طلباتهم، وإجمالي المشتريات ومتابعة السداد</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.openAddCustomerModal()">+ إضافة عميل جديد</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>اسم العميل</th>
+                <th>رقم الهاتف</th>
+                <th>العنوان</th>
+                <th>عدد الطلبات</th>
+                <th>إجمالي التعاملات</th>
+                <th>ملاحظات</th>
+              </tr>
+            </thead>
+            <tbody id="customers-table-body">
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- 7. تبويب إعدادات الطابعة Neptune 4 Pro -->
+    <section id="tab-printer" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>إعدادات الطابعة: Elegoo Neptune 4 Pro</h1>
+          <p>معايير استهلاك الطاقة، الإهلاك، الصيانة، وتكلفة ساعة التشغيل الحقيقية</p>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">⚙️ مواصفات وبيانات الطابعة</div>
+          </div>
+          <form id="printer-settings-form" onsubmit="App.savePrinterSettings(event)">
+            <div class="form-group">
+              <label>اسم الطابعة والماركة</label>
+              <input type="text" id="printer-name" class="form-control" value="Elegoo Neptune 4 Pro" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>سعر شراء الطابعة (ج.م)</label>
+                <input type="number" id="printer-price" class="form-control" value="22000" required>
+              </div>
+              <div class="form-group">
+                <label>العمر الافتراضي (ساعات)</label>
+                <input type="number" id="printer-lifespan" class="form-control" value="6000" required>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label>متوسط استهلاك الطاقة (kW)</label>
+                <input type="number" step="0.01" id="printer-power" class="form-control" value="0.22" required>
+              </div>
+              <div class="form-group">
+                <label>سعر كيلوواط الكهرباء (ج.م)</label>
+                <input type="number" step="0.1" id="printer-elec-rate" class="form-control" value="2.5" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label>تكلفة المستهلكات والصيانة / ساعة (ج.م)</label>
+              <input type="number" step="0.5" id="printer-consumables" class="form-control" value="5.0" required>
+            </div>
+            <button type="submit" class="btn btn-primary" style="margin-top: 10px;">💾 حفظ إعدادات الطابعة</button>
+          </form>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">💡 تفصيل تكلفة ساعة تشغيل الماكينة</div>
+          </div>
+          <div class="kpi-grid" style="grid-template-columns: 1fr; gap: 12px;">
+            <div class="kpi-card">
+              <div class="kpi-title">⚡ تكلفة الكهرباء للساعة</div>
+              <div class="kpi-value" id="calc-hourly-power">0.55 ج.م/س</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">🛠️ إهلاك الطابعة للساعة</div>
+              <div class="kpi-value" id="calc-hourly-deprec">3.67 ج.م/س</div>
+            </div>
+            <div class="kpi-card">
+              <div class="kpi-title">🔧 الصيانة والنوزل للساعة</div>
+              <div class="kpi-value" id="calc-hourly-consumables">5.00 ج.م/س</div>
+            </div>
+            <div class="kpi-card" style="border-color: var(--accent-cyan); background: rgba(6, 182, 212, 0.05);">
+              <div class="kpi-title" style="color: var(--accent-cyan); font-weight: 700;">📊 إجمالي تكلفة تشغيل الماكينة للساعة</div>
+              <div class="kpi-value" id="calc-hourly-total" style="color: var(--accent-cyan);">9.22 ج.م/س</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. تبويب النسخ الاحتياطي والجاهزية للمزامنة -->
+    <section id="tab-backup" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>النسخ الاحتياطي وأمان البيانات</h1>
+          <p>تصدير واستيراد قاعدة بيانات ورشة ELMALHY.3D لضمان حفظ كل البيانات والعمل أوفلاين</p>
+        </div>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;">
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📤 تصدير نسخة احتياطية (Export)</div>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+            قم بتحميل ملف JSON كامل يحتوي على كل المنتجات والعملاء والطلبات والمخزون وسجل الحركات للورشة.
+          </p>
+          <button class="btn btn-primary" onclick="App.exportBackup()">⬇️ تحميل النسخة الاحتياطية (JSON)</button>
+        </div>
+
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📥 استعادة نسخة سابقة (Restore)</div>
+          </div>
+          <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 20px;">
+            اختر ملف نسخة احتياطية لاسترجاع كافة بيانات الورشة وحساباتها.
+          </p>
+          <input type="file" id="backup-file-input" accept=".json" style="margin-bottom: 15px; color: var(--text-muted);">
+          <br>
+          <button class="btn btn-secondary" onclick="App.importBackup()">⬆️ استعادة البيانات الآن</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- نوافذ Modal التفاعلية -->
+
+  <!-- Modal إنشاء طلب / عرض سعر جديد -->
+  <div id="modal-order" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 id="modal-order-title">إنشاء طلب جديد</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-order')">✕</button>
+      </div>
+      <form id="order-form" onsubmit="App.saveNewOrder(event)">
+        <input type="hidden" id="order-is-quote" value="false">
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>اسم العميل</label>
+            <input type="text" id="order-cust-name" class="form-control" placeholder="مثال: م. أحمد خالد" required>
+          </div>
+          <div class="form-group">
+            <label>رقم هاتف / واتساب العميل</label>
+            <input type="text" id="order-cust-phone" class="form-control" placeholder="01xxxxxxxxx">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>اختر منتج من الكتالوج (أو اتركه لتخصيص يدوي)</label>
+            <select id="order-product-select" class="form-control" onchange="App.onOrderProductSelected()">
+              <option value="">-- قطعة مخصصة حسب الطلب --</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>كود SKU أو اسم القطعة</label>
+            <input type="text" id="order-item-name" class="form-control" placeholder="اسم القطعة المطبوعة" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>الكمية المطلوبة</label>
+            <input type="number" min="1" id="order-item-qty" class="form-control" value="1" oninput="App.recalcOrderModal()" required>
+          </div>
+          <div class="form-group">
+            <label>بكرة الفلمنت المستخدمة</label>
+            <select id="order-filament-select" class="form-control" onchange="App.recalcOrderModal()">
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>وزن القطعة الواحدة (جرام)</label>
+            <input type="number" step="0.5" id="order-item-weight" class="form-control" value="50" oninput="App.recalcOrderModal()" required>
+          </div>
+          <div class="form-group">
+            <label>زمن الطباعة للقطعة (ساعات)</label>
+            <input type="number" step="0.1" id="order-item-hours" class="form-control" value="2.5" oninput="App.recalcOrderModal()" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>هامش الربح المطلوب (%)</label>
+            <input type="number" id="order-margin-pct" class="form-control" value="40" oninput="App.recalcOrderModal()">
+          </div>
+          <div class="form-group">
+            <label>تكلفة التشطيب / الملحقات (ج.م)</label>
+            <input type="number" id="order-postprocess-cost" class="form-control" value="0" oninput="App.recalcOrderModal()">
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>مصاريف الشحن والتوصيل (ج.م)</label>
+            <input type="number" id="order-shipping-fee" class="form-control" value="0" oninput="App.recalcOrderModal()">
+          </div>
+          <div class="form-group">
+            <label>العربون المدفوع مقدماً (ج.م)</label>
+            <input type="number" id="order-deposit-paid" class="form-control" value="0" oninput="App.recalcOrderModal()">
+          </div>
+        </div>
+
+        <!-- معاينة الحساب المباشر -->
+        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
+            <span>التكلفة التقديرية للقطعة: <strong id="modal-calc-unit-cost" style="color: var(--accent-orange)">0 ج.م</strong></span>
+            <span>سعر البيع المقترح للقطعة: <strong id="modal-calc-unit-price" style="color: var(--accent-green)">0 ج.م</strong></span>
+          </div>
+          <div style="display: flex; justify-content: space-between; font-size: 0.95rem; font-weight: 700;">
+            <span>إجمالي الطلبية: <span id="modal-calc-grand-total">0 ج.م</span></span>
+            <span>المبلغ المتبقي: <span id="modal-calc-remaining" style="color: var(--accent-cyan)">0 ج.م</span></span>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">حفظ والتأكيد</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal فحص الجودة وتسجيل الفعلي مقابل المقدر بعد الطباعة -->
+  <div id="modal-complete-job" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>تسجيل نتيجة الطباعة وفحص الجودة (QC)</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-complete-job')">✕</button>
+      </div>
+      <form id="complete-job-form" onsubmit="App.saveJobCompletion(event)">
+        <input type="hidden" id="job-order-id">
+
+        <div class="form-group">
+          <label>حالة نجاح الطباعة</label>
+          <select id="job-status" class="form-control">
+            <option value="success">✅ نجحت الطباعة واجتازت الجودة</option>
+            <option value="failed">❌ فشلت الطباعة (تالف)</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>الوزن الفعلي الحقيقي (جرام)</label>
+            <input type="number" step="0.5" id="job-actual-weight" class="form-control" required>
+          </div>
+          <div class="form-group">
+            <label>زمن الطباعة الفعلي (ساعات)</label>
+            <input type="number" step="0.1" id="job-actual-hours" class="form-control" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>ملاحظات الجودة أو سبب الفشل إن وُجد</label>
+          <textarea id="job-notes" class="form-control" rows="3" placeholder="ملاحظات السطح، الالتصاق، الخيوط..."></textarea>
+        </div>
+
+        <button type="submit" class="btn btn-success" style="width: 100%;">اعتماد وحساب الفارق (Variance)</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal إضافة صنف مخزون -->
+  <div id="modal-inventory" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>إضافة صنف / رصيد للمخزون</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-inventory')">✕</button>
+      </div>
+      <form id="add-inventory-form" onsubmit="App.saveInventoryItem(event)">
+        <div class="form-group">
+          <label>نوع الصنف</label>
+          <select id="inv-item-type" class="form-control" onchange="App.onInvTypeChanged()">
+            <option value="filament">بكرة فلمنت (Filament)</option>
+            <option value="hardware">ملحقات ومعدات (Hardware: مغناطيس، مسامير...)</option>
+            <option value="packaging">مواد تغليف (Packaging)</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>اسم الصنف والمواصفة</label>
+          <input type="text" id="inv-item-name" class="form-control" placeholder="مثال: eSUN PLA+ Black أو مغناطيس 10x2" required>
+        </div>
+
+        <div id="inv-filament-fields">
+          <div class="form-row">
+            <div class="form-group">
+              <label>المادة (Material)</label>
+              <input type="text" id="inv-fil-material" class="form-control" value="PLA+">
+            </div>
+            <div class="form-group">
+              <label>اللون</label>
+              <input type="text" id="inv-fil-color" class="form-control" value="أسود">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>وزن البكرة بالجرام</label>
+              <input type="number" id="inv-fil-weight" class="form-control" value="1000">
+            </div>
+            <div class="form-group">
+              <label>سعر البكرة (ج.م)</label>
+              <input type="number" id="inv-fil-price" class="form-control" value="750">
+            </div>
+          </div>
+        </div>
+
+        <div id="inv-other-fields" style="display: none;">
+          <div class="form-row">
+            <div class="form-group">
+              <label>الكمية المضافة</label>
+              <input type="number" id="inv-other-qty" class="form-control" value="50">
+            </div>
+            <div class="form-group">
+              <label>تكلفة القطعة (ج.م)</label>
+              <input type="number" step="0.1" id="inv-other-cost" class="form-control" value="2.5">
+            </div>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>حد إعادة الطلب (Reorder Alert)</label>
+          <input type="number" id="inv-reorder-level" class="form-control" value="200">
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">حفظ في المخزون</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal إضافة منتج للكتالوج -->
+  <div id="modal-product" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>إضافة منتج جديد للكتالوج</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-product')">✕</button>
+      </div>
+      <form id="add-product-form" onsubmit="App.saveNewProduct(event)">
+        <div class="form-row">
+          <div class="form-group">
+            <label>اسم المنتج</label>
+            <input type="text" id="prod-name" class="form-control" required placeholder="مثال: فازة حلزونية هندسية">
+          </div>
+          <div class="form-group">
+            <label>التصنيف</label>
+            <select id="prod-category" class="form-control">
+              <option value="ديكور">ديكور وإضاءة</option>
+              <option value="هدايا">هدايا وتذكارات</option>
+              <option value="تنظيم">تنظيم واكسسوارات</option>
+              <option value="قطع هندسية">قطع هندسية وصناعية</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>كود SKU (اختياري - يُنشأ تلقائياً إن ترك فارغاً)</label>
+            <input type="text" id="prod-sku" class="form-control" placeholder="DEC-VASE-01">
+          </div>
+          <div class="form-group">
+            <label>سعر البيع المقترح (ج.م)</label>
+            <input type="number" id="prod-base-price" class="form-control" value="250" required>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>الوزن الافتراضي (جرام)</label>
+            <input type="number" id="prod-weight" class="form-control" value="80" required>
+          </div>
+          <div class="form-group">
+            <label>زمن الطباعة الافتراضي (ساعات)</label>
+            <input type="number" step="0.1" id="prod-hours" class="form-control" value="4.5" required>
+          </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width: 100%;">حفظ المنتج بالكتالوج</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal إضافة عميل -->
+  <div id="modal-customer" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>إضافة عميل جديد</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-customer')">✕</button>
+      </div>
+      <form id="add-customer-form" onsubmit="App.saveNewCustomer(event)">
+        <div class="form-group">
+          <label>اسم العميل</label>
+          <input type="text" id="cust-name" class="form-control" required placeholder="الاسم ثلاثي أو اسم الشركة">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label>رقم الهاتف</label>
+            <input type="text" id="cust-phone" class="form-control" required placeholder="01xxxxxxxxx">
+          </div>
+          <div class="form-group">
+            <label>العنوان / المحافظة</label>
+            <input type="text" id="cust-address" class="form-control" placeholder="القاهرة، التجمع...">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>ملاحظات</label>
+          <textarea id="cust-notes" class="form-control" rows="2"></textarea>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">حفظ بيانات العميل</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal تسجيل دفعة / تحصيل -->
+  <div id="modal-payment" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>تسجيل دفعة نقدية / تحصيل</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-payment')">✕</button>
+      </div>
+      <form id="payment-form" onsubmit="App.saveOrderPayment(event)">
+        <input type="hidden" id="payment-order-id">
+        <div class="form-group">
+          <label>المبلغ المدفوع (ج.م)</label>
+          <input type="number" step="0.5" id="payment-amount" class="form-control" required>
+        </div>
+        <div class="form-group">
+          <label>طريقة الدفع</label>
+          <select id="payment-method" class="form-control">
+            <option value="فودافون كاش / إنستاباي">فودافون كاش / إنستاباي (InstaPay)</option>
+            <option value="كاش عند الاستلام">كاش عند الاستلام</option>
+            <option value="تحويل بنكي">تحويل بنكي</option>
+          </select>
+        </div>
+        <button type="submit" class="btn btn-success" style="width: 100%;">تأكيد التحصيل وتحديث الرصيد</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Scripts -->
+  <script src="js/core/db.js"></script>
+  <script src="js/core/calc.js"></script>
+  <script src="js/core/events.js"></script>
+  <script src="js/modules/inventory.js"></script>
+  <script src="js/modules/orders.js"></script>
+  <script src="js/modules/products.js"></script>
+  <script src="js/modules/customers.js"></script>
+  <script src="js/modules/printer.js"></script>
+  <script src="js/modules/dashboard.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
