@@ -774,183 +774,730 @@
       if (modal) modal.classList.remove('active');
     },
 
-    // ===== CALCULATOR INTEGRATED METHODS =====
-    initCalculator() {
-      const defaults = root.WorkshopCalculator
-        ? root.WorkshopCalculator.getDefaultSettings()
-        : {};
-      const powEl = document.getElementById('calc-power');
-      const elecEl = document.getElementById('calc-elec-rate');
-      const consEl = document.getElementById('calc-consumables');
-      const margEl = document.getElementById('calc-margin');
-      const depEl = document.getElementById('calc-deprec');
+    // ===== CALCULATOR INTEGRATED METHODS (GENIADY 3D ENGINE) =====
+    _currentMarketId: 'EG',
+    _activePresetId: '3dbenchy',
+    _modelGeometry: {
+      solidVolumeMm3: 11350,
+      surfaceAreaMm2: 8400,
+      dimensions: { width: 60, depth: 31, height: 48 },
+      triangleCount: 12500,
+      name: '#3DBenchy Boat'
+    },
+    _lastIntegratedCalcResult: null,
+    _threeState: null,
 
-      if (powEl && defaults.printerPowerKw) powEl.value = defaults.printerPowerKw;
-      if (elecEl && defaults.electricityRate) elecEl.value = defaults.electricityRate;
-      if (consEl && defaults.consumablesPerHour) consEl.value = defaults.consumablesPerHour;
-      if (margEl && defaults.defaultMarginPercent) margEl.value = defaults.defaultMarginPercent;
-      if (depEl) {
-        const depPerHour = ((defaults.printerPrice || 22000) / (defaults.printerLifespanHours || 6000));
-        depEl.value = Math.round(depPerHour * 100) / 100;
+    initCalculator() {
+      const CalcMod = root.WorkshopCalculator;
+      if (!CalcMod) return;
+
+      this.calcSetMarket('EG', false);
+      this.init3DViewer();
+      this.setupSTLDropzone();
+      this.calcLoadPreset('3dbenchy');
+      this.calcUpdate();
+    },
+
+    init3DViewer() {
+      const container = document.getElementById('calc-viewport-container');
+      const canvas = document.getElementById('calc-3d-canvas');
+      if (!container || !canvas) return;
+
+      if (typeof THREE === 'undefined') {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          canvas.width = container.clientWidth || 300;
+          canvas.height = 240;
+          ctx.fillStyle = '#0e1726';
+          ctx.fillRect(0, 0, canvas.width, canvas.height);
+          ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+          ctx.lineWidth = 1;
+          for (let x = 20; x < canvas.width; x += 30) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+          }
+          for (let y = 20; y < canvas.height; y += 30) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+          }
+          ctx.fillStyle = '#38bdf8';
+          ctx.font = '13px system-ui, sans-serif';
+          ctx.textAlign = 'center';
+          ctx.fillText('🖨️ سطح طابعة ورشة ELMALHY.3D', canvas.width / 2, canvas.height / 2);
+        }
+        return;
       }
+
+      try {
+        const width = container.clientWidth || 300;
+        const height = 240;
+
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a101d);
+
+        const camera = new THREE.PerspectiveCamera(45, width / height, 1, 2000);
+        camera.position.set(120, -180, 130);
+        camera.up.set(0, 0, 1);
+
+        const renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: true });
+        renderer.setSize(width, height);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+
+        const ambLight = new THREE.AmbientLight(0xffffff, 0.65);
+        scene.add(ambLight);
+
+        const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+        dirLight.position.set(100, -100, 200);
+        scene.add(dirLight);
+
+        const gridHelper = new THREE.GridHelper(225, 15, 0x38bdf8, 0x1f3454);
+        gridHelper.rotation.x = Math.PI / 2;
+        scene.add(gridHelper);
+
+        const meshGroup = new THREE.Group();
+        scene.add(meshGroup);
+
+        this._threeState = {
+          scene,
+          camera,
+          renderer,
+          meshGroup,
+          gridHelper,
+          wireframe: false,
+          autoRotate: true
+        };
+
+        const animate = () => {
+          if (!this._threeState) return;
+          requestAnimationFrame(animate);
+          if (this._threeState.autoRotate && this._threeState.meshGroup) {
+            this._threeState.meshGroup.rotation.z += 0.008;
+          }
+          camera.lookAt(0, 0, 20);
+          renderer.render(scene, camera);
+        };
+        animate();
+
+        window.addEventListener('resize', () => {
+          if (!this._threeState || !container) return;
+          const w = container.clientWidth;
+          const h = 240;
+          this._threeState.camera.aspect = w / h;
+          this._threeState.camera.updateProjectionMatrix();
+          this._threeState.renderer.setSize(w, h);
+        });
+      } catch (e) {
+        console.warn('3D initialization warning:', e);
+      }
+    },
+
+    calcUpdate3DGeometry(geo, name = '3D Model') {
+      const nameEl = document.getElementById('viewport-model-name');
+      if (nameEl) nameEl.textContent = name;
+
+      if (!this._threeState || typeof THREE === 'undefined') return;
+      const { scene, meshGroup, wireframe } = this._threeState;
+
+      while (meshGroup.children.length > 0) {
+        const obj = meshGroup.children[0];
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+        meshGroup.remove(obj);
+      }
+
+      let threeGeo;
+      if (geo instanceof THREE.BufferGeometry) {
+        threeGeo = geo;
+      } else {
+        const w = Math.min(150, Math.max(10, geo?.dimensions?.width || 50));
+        const d = Math.min(150, Math.max(10, geo?.dimensions?.depth || 30));
+        const h = Math.min(150, Math.max(10, geo?.dimensions?.height || 40));
+        threeGeo = new THREE.BoxGeometry(w, d, h);
+        threeGeo.translate(0, 0, h / 2);
+      }
+
+      const mat = new THREE.MeshStandardMaterial({
+        color: 0x38bdf8,
+        roughness: 0.35,
+        metalness: 0.15,
+        wireframe: wireframe
+      });
+
+      const mesh = new THREE.Mesh(threeGeo, mat);
+      meshGroup.add(mesh);
+    },
+
+    calcToggleWireframe() {
+      if (!this._threeState) return;
+      this._threeState.wireframe = !this._threeState.wireframe;
+      if (this._threeState.meshGroup) {
+        this._threeState.meshGroup.traverse(child => {
+          if (child.isMesh && child.material) {
+            child.material.wireframe = this._threeState.wireframe;
+          }
+        });
+      }
+    },
+
+    calcResetCamera() {
+      if (!this._threeState) return;
+      this._threeState.camera.position.set(120, -180, 130);
+      if (this._threeState.meshGroup) {
+        this._threeState.meshGroup.rotation.z = 0;
+      }
+    },
+
+    setupSTLDropzone() {
+      const dropzone = document.getElementById('stl-dropzone');
+      if (!dropzone) return;
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropzone.classList.add('dragover');
+        });
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          dropzone.classList.remove('dragover');
+        });
+      });
+
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        if (files && files.length > 0) {
+          this.calcProcessSTLFile(files[0]);
+        }
+      });
+    },
+
+    calcHandleFileUpload(event) {
+      const file = event.target.files?.[0];
+      if (file) {
+        this.calcProcessSTLFile(file);
+      }
+    },
+
+    calcProcessSTLFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const buffer = e.target.result;
+          const parsed = root.WorkshopCalc.parseSTL(buffer);
+
+          this._activePresetId = 'custom-stl';
+          this._modelGeometry = {
+            name: file.name.replace(/\.[^/.]+$/, ''),
+            solidVolumeMm3: parsed.volumeMm3,
+            surfaceAreaMm2: parsed.surfaceAreaMm2,
+            dimensions: parsed.dimensions,
+            triangleCount: parsed.triangleCount
+          };
+
+          document.querySelectorAll('.model-preset-card').forEach(c => c.classList.remove('active'));
+
+          const dimEl = document.getElementById('m-metric-dim');
+          const volEl = document.getElementById('m-metric-vol');
+          const areaEl = document.getElementById('m-metric-area');
+          const triEl = document.getElementById('m-metric-tri');
+
+          if (dimEl) dimEl.textContent = `${parsed.dimensions.width} × ${parsed.dimensions.depth} × ${parsed.dimensions.height} مم`;
+          if (volEl) volEl.textContent = `${parsed.volumeCm3} cm³`;
+          if (areaEl) areaEl.textContent = `${parsed.surfaceAreaCm2} cm²`;
+          if (triEl) triEl.textContent = parsed.triangleCount.toLocaleString('ar-EG');
+
+          this.calcUpdate3DGeometry(this._modelGeometry, `📂 ${this._modelGeometry.name}`);
+          this.calcAutoNesting();
+          this.calcUpdate();
+        } catch (err) {
+          alert('تعذر قراءة ملف STL: يرجى التأكد من صحة الملف بصيغة Binary أو ASCII.');
+          console.error(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    },
+
+    calcSetMarket(marketId, update = true) {
+      const CalcMod = root.WorkshopCalculator;
+      if (!CalcMod) return;
+
+      const markets = CalcMod.getMarkets();
+      const market = markets[marketId] || markets.EG;
+      this._currentMarketId = market.id;
+
+      document.querySelectorAll('.market-pill').forEach(pill => {
+        pill.classList.toggle('active', pill.dataset.market === market.id);
+      });
+
+      const badge = document.getElementById('calc-out-market-badge');
+      if (badge) badge.textContent = `${market.flag} ${market.currency.code}`;
+
+      const sym = document.getElementById('calc-out-currency-sym');
+      if (sym) sym.textContent = market.currency.symbol;
+
+      const spoolCur = document.getElementById('calc-spool-currency');
+      if (spoolCur) spoolCur.textContent = market.currency.symbol;
+
+      document.querySelectorAll('.calc-cur-label').forEach(el => {
+        el.textContent = market.currency.symbol;
+      });
+
+      const elecEl = document.getElementById('calc-elec-rate');
+      if (elecEl) elecEl.value = market.electricityCostPerKwh;
+
+      const laborEl = document.getElementById('calc-labor-rate');
+      if (laborEl) laborEl.value = market.laborHourlyRate;
+
+      const failEl = document.getElementById('calc-failure');
+      if (failEl) failEl.value = market.defaultFailureRatePercent;
+
+      const margEl = document.getElementById('calc-margin');
+      if (margEl) margEl.value = market.defaultProfitMarginPercent;
+
+      const maintEl = document.getElementById('calc-maint-rate');
+      if (maintEl) maintEl.value = market.defaultMaintenancePercentOfDepreciation;
+
+      const printerEl = document.getElementById('calc-printer-cost');
+      if (printerEl) {
+        printerEl.value = market.id === 'EG' ? 22000 : market.defaultPrinterCost;
+      }
+
+      this.onCalcMaterialChange();
+      if (update) this.calcUpdate();
+    },
+
+    calcLoadPreset(presetId) {
+      const CalcMod = root.WorkshopCalculator;
+      if (!CalcMod) return;
+
+      const presets = CalcMod.getModelPresets();
+      const preset = presets.find(p => p.id === presetId) || presets[0];
+      this._activePresetId = preset.id;
+
+      document.querySelectorAll('.model-preset-card').forEach(c => {
+        c.classList.toggle('active', c.dataset.preset === preset.id);
+      });
+
+      this._modelGeometry = {
+        name: preset.name,
+        solidVolumeMm3: preset.volumeMm3,
+        surfaceAreaMm2: preset.surfaceAreaMm2,
+        dimensions: preset.dimensions,
+        triangleCount: preset.id === '3dbenchy' ? 12500 : 25000
+      };
+
+      const dimEl = document.getElementById('m-metric-dim');
+      const volEl = document.getElementById('m-metric-vol');
+      const areaEl = document.getElementById('m-metric-area');
+      const triEl = document.getElementById('m-metric-tri');
+
+      if (dimEl) dimEl.textContent = `${preset.dimensions.width} × ${preset.dimensions.depth} × ${preset.dimensions.height} مم`;
+      if (volEl) volEl.textContent = `${(preset.volumeMm3 / 1000).toFixed(2)} cm³`;
+      if (areaEl) areaEl.textContent = `${(preset.surfaceAreaMm2 / 100).toFixed(1)} cm²`;
+      if (triEl) triEl.textContent = this._modelGeometry.triangleCount.toLocaleString('ar-EG');
+
+      if (preset.defaultInfill !== undefined) {
+        const infillInput = document.getElementById('calc-infill');
+        const infillBadge = document.getElementById('calc-infill-badge');
+        if (infillInput) infillInput.value = preset.defaultInfill;
+        if (infillBadge) infillBadge.textContent = preset.defaultInfill + '%';
+      }
+
+      if (preset.defaultWalls !== undefined) {
+        const wallInput = document.getElementById('calc-walls');
+        if (wallInput) wallInput.value = preset.defaultWalls;
+      }
+
+      const mcToggle = document.getElementById('calc-multicolor-toggle');
+      const mcFields = document.getElementById('multicolor-fields');
+      const mcChip = document.getElementById('chip-multicolor-status');
+      if (preset.multiColor?.enabled) {
+        if (mcToggle) mcToggle.checked = true;
+        if (mcFields) mcFields.style.display = 'block';
+        if (mcChip) mcChip.textContent = `${preset.multiColor.colorSwapsCount} تبديلة`;
+        const swapsEl = document.getElementById('calc-color-swaps');
+        if (swapsEl) swapsEl.value = preset.multiColor.colorSwapsCount;
+      } else {
+        if (mcToggle) mcToggle.checked = false;
+        if (mcFields) mcFields.style.display = 'none';
+        if (mcChip) mcChip.textContent = 'معطل';
+      }
+
+      this.calcUpdate3DGeometry(this._modelGeometry, `${preset.icon} ${preset.name}`);
+      this.calcAutoNesting();
+      this.calcUpdate();
+    },
+
+    calcStepQty(delta) {
+      const qtyEl = document.getElementById('calc-qty');
+      if (!qtyEl) return;
+      const cur = parseInt(qtyEl.value, 10) || 1;
+      qtyEl.value = Math.max(1, cur + delta);
+      this.calcUpdate();
+    },
+
+    onInfillSliderChange() {
+      const slider = document.getElementById('calc-infill');
+      const badge = document.getElementById('calc-infill-badge');
+      if (slider && badge) {
+        badge.textContent = slider.value + '%';
+      }
+      this.calcUpdate();
+    },
+
+    calcToggleMulticolor() {
+      const toggle = document.getElementById('calc-multicolor-toggle');
+      const fields = document.getElementById('multicolor-fields');
+      const chip = document.getElementById('chip-multicolor-status');
+      if (!toggle) return;
+
+      const active = toggle.checked;
+      if (fields) fields.style.display = active ? 'block' : 'none';
+      if (chip) chip.textContent = active ? 'مفعل (هدر إضافي)' : 'معطل';
       this.calcUpdate();
     },
 
     onCalcMaterialChange() {
       const matSel = document.getElementById('calc-material');
-      if (!matSel) return;
-      const opt = matSel.options[matSel.selectedIndex];
-      const defaultSpool = opt ? opt.getAttribute('data-spool') : null;
-      if (defaultSpool) {
-        document.getElementById('calc-spool-price').value = defaultSpool;
+      const spoolInput = document.getElementById('calc-spool-price');
+      if (!matSel || !spoolInput) return;
+
+      const CalcMod = root.WorkshopCalculator;
+      if (!CalcMod) return;
+
+      const markets = CalcMod.getMarkets();
+      const market = markets[this._currentMarketId] || markets.EG;
+      const matId = matSel.value;
+      const defaultPrice = market.filamentPricePerKg[matId] || 900;
+
+      spoolInput.value = defaultPrice;
+      this.calcUpdate();
+    },
+
+    onPrinterProfileChange() {
+      const profSel = document.getElementById('calc-printer-profile');
+      if (!profSel) return;
+
+      const CalcMod = root.WorkshopCalculator;
+      if (!CalcMod) return;
+
+      const profiles = CalcMod.getPrinterProfiles();
+      const profile = profiles[profSel.value] || profiles.neptune_4_pro;
+
+      const pWatts = document.getElementById('calc-power-watts');
+      if (pWatts) pWatts.value = profile.powerConsumptionWatts;
+
+      const pCost = document.getElementById('calc-printer-cost');
+      if (pCost) {
+        pCost.value = this._currentMarketId === 'EG' ? (profile.defaultCostEGP || 22000) : profile.defaultCostUSD;
       }
+
+      const pLife = document.getElementById('calc-lifespan-hours');
+      if (pLife) pLife.value = profile.lifespanHours;
+
+      const bedChip = document.getElementById('chip-bed-size');
+      if (bedChip) {
+        bedChip.textContent = `سطح الطابعة: ${profile.bedSizeMm.x} × ${profile.bedSizeMm.y} مم`;
+      }
+
+      this.calcAutoNesting();
+      this.calcUpdate();
+    },
+
+    calcAutoNesting() {
+      const Calc = root.WorkshopCalc;
+      const CalcMod = root.WorkshopCalculator;
+      if (!Calc || !CalcMod) return;
+
+      const profiles = CalcMod.getPrinterProfiles();
+      const profId = document.getElementById('calc-printer-profile')?.value || 'neptune_4_pro';
+      const printer = profiles[profId] || profiles.neptune_4_pro;
+
+      const footprint = {
+        x: this._modelGeometry?.dimensions?.width || 50,
+        y: this._modelGeometry?.dimensions?.depth || 50
+      };
+      const height = this._modelGeometry?.dimensions?.height || 50;
+      const hasPrime = document.getElementById('calc-multicolor-toggle')?.checked === true;
+
+      const autoCap = Calc.calculatePlateNesting(footprint, height, printer.bedSizeMm, hasPrime);
+
+      const pppEl = document.getElementById('calc-pieces-per-plate');
+      const autoCapEl = document.getElementById('calc-out-auto-capacity');
+      if (pppEl) pppEl.value = autoCap;
+      if (autoCapEl) autoCapEl.textContent = `${autoCap} قطع`;
+
       this.calcUpdate();
     },
 
     calcUpdate() {
-      const CalcEngine = root.WorkshopCalc;
-      if (!CalcEngine) return;
-
-      const weightEl = document.getElementById('calc-weight');
-      if (!weightEl) return;
-
-      const params = {
-        partWeight: Number(weightEl.value) || 0,
-        printHours: Number(document.getElementById('calc-hours').value) || 0,
-        quantity: Math.max(1, Number(document.getElementById('calc-qty').value) || 1),
-        spoolPrice: Number(document.getElementById('calc-spool-price').value) || 700,
-        spoolWeight: 1000,
-        printerPowerKw: Number(document.getElementById('calc-power').value) || 0.22,
-        electricityRate: Number(document.getElementById('calc-elec-rate').value) || 2.5,
-        printerPrice: 0,
-        printerLifespanHours: 1,
-        consumablesPerHour: Number(document.getElementById('calc-consumables').value) || 5,
-        laborHours: Number(document.getElementById('calc-labor-hours').value) || 0,
-        laborRatePerHour: Number(document.getElementById('calc-labor-rate').value) || 50,
-        hardwareCost: Number(document.getElementById('calc-hardware').value) || 0,
-        postProcessCost: Number(document.getElementById('calc-postprocess').value) || 0,
-        packagingCost: Number(document.getElementById('calc-packaging').value) || 0,
-        shippingFee: Number(document.getElementById('calc-shipping').value) || 0,
-        profitMarginPercent: Number(document.getElementById('calc-margin').value) || 40,
-        failureRatePercent: Number(document.getElementById('calc-failure').value) || 5,
-        minOrderPrice: Number(document.getElementById('calc-min-price').value) || 0,
-      };
-
-      const deprecPerHour = Number(document.getElementById('calc-deprec').value) || 0;
-      params.consumablesPerHour = (Number(document.getElementById('calc-consumables').value) || 5) + deprecPerHour;
-
-      const res = CalcEngine.calculateCost(params);
-      const qty = params.quantity;
-
-      const fmt = (v) => (Math.round((v || 0) * 100) / 100).toLocaleString('ar-EG', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-
-      const outPrice = document.getElementById('calc-out-price');
-      if (outPrice) outPrice.textContent = fmt(res.finalUnitPrice);
-
-      const outMat = document.getElementById('calc-out-material');
-      if (outMat) outMat.textContent = fmt(res.materialCost) + ' ج.م';
-
-      const outPow = document.getElementById('calc-out-power');
-      if (outPow) outPow.textContent = fmt(res.powerCost) + ' ج.م';
-
-      const outDep = document.getElementById('calc-out-deprec');
-      if (outDep) outDep.textContent = fmt(deprecPerHour * params.printHours) + ' ج.م';
-
-      const outCons = document.getElementById('calc-out-consumables');
-      if (outCons) outCons.textContent = fmt((Number(document.getElementById('calc-consumables').value) || 5) * params.printHours) + ' ج.م';
-
-      const outLab = document.getElementById('calc-out-labor');
-      if (outLab) outLab.textContent = fmt(res.laborCost + res.postProcessCost) + ' ج.م';
-
-      const outExt = document.getElementById('calc-out-extras');
-      if (outExt) outExt.textContent = fmt(res.hardwareCost + res.packagingCost) + ' ج.م';
-
-      const outFail = document.getElementById('calc-out-failure');
-      if (outFail) outFail.textContent = fmt(res.failureCost) + ' ج.م';
-
-      const outTotal = document.getElementById('calc-out-total-cost');
-      if (outTotal) outTotal.textContent = fmt(res.totalUnitCost) + ' ج.م';
-
-      const outMarg = document.getElementById('calc-out-margin');
-      if (outMarg) outMarg.textContent = res.actualMarginPercent + '%';
-
-      const outProf = document.getElementById('calc-out-profit');
-      if (outProf) outProf.textContent = fmt(res.unitProfit) + ' ج.م';
-
-      const outQtyLbl = document.getElementById('calc-out-qty-label');
-      if (outQtyLbl) outQtyLbl.textContent = '×' + qty;
-
-      const outBatch = document.getElementById('calc-out-batch');
-      if (outBatch) outBatch.textContent = fmt(res.batchTotalPrice) + ' ج.م';
-
-      const outGram = document.getElementById('calc-out-per-gram');
-      if (outGram) outGram.textContent = res.partWeight > 0 ? fmt(res.totalUnitCost / res.partWeight) : '0';
-
-      const outHour = document.getElementById('calc-out-per-hour');
-      if (outHour) outHour.textContent = res.printHours > 0 ? fmt(res.totalUnitCost / res.printHours) : '0';
-
-      const outMark = document.getElementById('calc-out-markup');
-      if (outMark) outMark.textContent = res.markupPercent + '%';
-
-      this._lastCalcResult = res;
-    },
-
-    calcConvertLength() {
       const CalcMod = root.WorkshopCalculator;
       if (!CalcMod) return;
-      const lenMm = Number(document.getElementById('calc-length-mm').value) || 0;
-      if (!lenMm) return;
-      const diamMm = Number(document.getElementById('calc-diameter').value) || 1.75;
-      const matId = document.getElementById('calc-material').value;
-      const wg = CalcMod.convertFilamentLength(lenMm, diamMm, matId);
-      document.getElementById('calc-weight').value = wg;
-      this.calcUpdate();
+
+      const solidVol = this._modelGeometry?.solidVolumeMm3 || 11350;
+      const surfArea = this._modelGeometry?.surfaceAreaMm2 || 8400;
+      const heightMm = this._modelGeometry?.dimensions?.height || 48;
+      const footprintX = this._modelGeometry?.dimensions?.width || 60;
+      const footprintY = this._modelGeometry?.dimensions?.depth || 31;
+
+      const infill = Number(document.getElementById('calc-infill')?.value ?? 15);
+      const walls = Number(document.getElementById('calc-walls')?.value ?? 3);
+      const layerH = Number(document.getElementById('calc-layer-height')?.value ?? 0.2);
+      const supType = document.getElementById('calc-support-type')?.value || 'tree';
+      const supCustom = Number(document.getElementById('calc-support-custom')?.value ?? 15);
+
+      const customSupGrp = document.getElementById('group-custom-support');
+      if (customSupGrp) {
+        customSupGrp.style.display = supType === 'custom' ? 'block' : 'none';
+      }
+
+      const mcEnabled = document.getElementById('calc-multicolor-toggle')?.checked === true;
+      const colorSwaps = Number(document.getElementById('calc-color-swaps')?.value ?? 48);
+      const flushVol = Number(document.getElementById('calc-flush-vol')?.value ?? 280);
+
+      const inputs = {
+        marketId: this._currentMarketId,
+        printerProfileId: document.getElementById('calc-printer-profile')?.value || 'neptune_4_pro',
+        materialId: document.getElementById('calc-material')?.value || 'pla_plus',
+        solidVolumeMm3: solidVol,
+        surfaceAreaMm2: surfArea,
+        heightMm: heightMm,
+        footprintX: footprintX,
+        footprintY: footprintY,
+        infillPercent: infill,
+        wallCount: walls,
+        layerHeightMm: layerH,
+        supportType: supType,
+        supportCustomPercent: supCustom,
+        multiColorEnabled: mcEnabled,
+        colorSwapsCount: colorSwaps,
+        flushVolumePerSwapMm3: flushVol,
+        quantity: parseInt(document.getElementById('calc-qty')?.value, 10) || 1,
+        piecesPerPlate: parseInt(document.getElementById('calc-pieces-per-plate')?.value, 10) || 8,
+        spoolPrice: Number(document.getElementById('calc-spool-price')?.value) || 950,
+        printerPowerWatts: Number(document.getElementById('calc-power-watts')?.value) || 220,
+        electricityRate: Number(document.getElementById('calc-elec-rate')?.value) || 2.5,
+        printerCost: Number(document.getElementById('calc-printer-cost')?.value) || 22000,
+        lifespanHours: Number(document.getElementById('calc-lifespan-hours')?.value) || 6000,
+        maintenanceRatePct: Number(document.getElementById('calc-maint-rate')?.value) || 20,
+        laborRatePerHour: Number(document.getElementById('calc-labor-rate')?.value) || 95,
+        prepMinutesPerPlate: Number(document.getElementById('calc-prep-mins')?.value ?? 5),
+        postMinutesPerPiece: Number(document.getElementById('calc-post-mins')?.value ?? 5),
+        hardwareCost: Number(document.getElementById('calc-hardware')?.value) || 0,
+        postProcessCost: 0,
+        packagingCost: Number(document.getElementById('calc-packaging')?.value) || 0,
+        shippingFee: Number(document.getElementById('calc-shipping')?.value) || 0,
+        failureRiskPercent: Number(document.getElementById('calc-failure')?.value ?? 7),
+        targetMarginPercent: Number(document.getElementById('calc-margin')?.value ?? 45),
+        minOrderPrice: Number(document.getElementById('calc-min-price')?.value) || 0
+      };
+
+      const res = CalcMod.calculateIntegrated(inputs);
+      this._lastIntegratedCalcResult = res;
+
+      // Update form fields with calculated values
+      const weightInput = document.getElementById('calc-weight');
+      if (weightInput && document.activeElement !== weightInput) {
+        weightInput.value = res.mass.singlePieceTotalGrams;
+      }
+
+      const hoursInput = document.getElementById('calc-hours');
+      if (hoursInput && document.activeElement !== hoursInput) {
+        hoursInput.value = res.time.printHoursPerPiece;
+      }
+
+      const platesEl = document.getElementById('calc-out-plates');
+      if (platesEl) platesEl.textContent = `${res.nesting.platesNeeded} ألواح طباعة (${res.nesting.piecesPerPlate} قطع/لوح)`;
+
+      const hourlyMachineRateEl = document.getElementById('calc-hourly-machine-rate');
+      if (hourlyMachineRateEl) {
+        const hourlyDeprec = res.printer.lifespanHours > 0 ? (inputs.printerCost / inputs.lifespanHours) : 0;
+        const hourlyMaint = hourlyDeprec * (inputs.maintenanceRatePct / 100);
+        hourlyMachineRateEl.value = (hourlyDeprec + hourlyMaint).toFixed(2);
+      }
+
+      // Waste summary bar
+      const supGEl = document.getElementById('calc-out-sup-g');
+      const purgeGEl = document.getElementById('calc-out-purge-g');
+      const totalWasteGEl = document.getElementById('calc-out-total-waste-g');
+      if (supGEl) supGEl.textContent = `${res.mass.supportMassGrams}g`;
+      if (purgeGEl) purgeGEl.textContent = `${res.mass.flushMassGrams + res.mass.primeTowerMassGrams}g`;
+      if (totalWasteGEl) totalWasteGEl.textContent = `${res.mass.totalWasteMassGrams}g (${res.mass.wastePercentageOfTotal}%)`;
+
+      // Results Card Output
+      const cur = res.currency;
+      const fmt = (v) => CalcMod.formatCurrency(v, cur);
+
+      const outPrice = document.getElementById('calc-out-price');
+      if (outPrice) outPrice.textContent = (Math.round((res.costs.suggestedRetailPrice || 0) * 100) / 100).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+      const outMat = document.getElementById('calc-out-material');
+      if (outMat) outMat.textContent = fmt(res.costs.netFilamentCost);
+
+      const outWaste = document.getElementById('calc-out-waste');
+      if (outWaste) outWaste.textContent = fmt(res.costs.wasteCost);
+
+      const outPow = document.getElementById('calc-out-power');
+      if (outPow) outPow.textContent = fmt(res.costs.powerCost);
+
+      const outDep = document.getElementById('calc-out-deprec');
+      if (outDep) outDep.textContent = fmt(res.costs.depreciationCost);
+
+      const outCons = document.getElementById('calc-out-consumables');
+      if (outCons) outCons.textContent = fmt(res.costs.maintenanceCost);
+
+      const outLab = document.getElementById('calc-out-labor');
+      if (outLab) outLab.textContent = fmt(res.costs.laborCostPerPiece);
+
+      const outExt = document.getElementById('calc-out-extras');
+      if (outExt) outExt.textContent = fmt(res.costs.hardwareCost + res.costs.packagingCost);
+
+      const outFail = document.getElementById('calc-out-failure');
+      if (outFail) outFail.textContent = fmt(res.costs.failureRiskBuffer);
+
+      const outTotal = document.getElementById('calc-out-total-cost');
+      if (outTotal) outTotal.textContent = fmt(res.costs.totalManufacturingCost);
+
+      const outMarg = document.getElementById('calc-out-margin');
+      if (outMarg) outMarg.textContent = `${res.costs.targetMarginPercent}%`;
+
+      const outProf = document.getElementById('calc-out-profit');
+      if (outProf) outProf.textContent = fmt(res.costs.unitGrossProfit);
+
+      const outQtyLbl = document.getElementById('calc-out-qty-label');
+      if (outQtyLbl) outQtyLbl.textContent = `×${res.nesting.quantity}`;
+
+      const outBatch = document.getElementById('calc-out-batch');
+      if (outBatch) outBatch.textContent = fmt(res.batch.batchTotalPrice);
+
+      const outBatchProf = document.getElementById('calc-out-batch-profit');
+      if (outBatchProf) outBatchProf.textContent = fmt(res.batch.batchGrossProfit);
+
+      const outGram = document.getElementById('calc-out-per-gram');
+      if (outGram) {
+        outGram.textContent = res.mass.singlePieceTotalGrams > 0
+          ? (res.costs.totalManufacturingCost / res.mass.singlePieceTotalGrams).toFixed(2)
+          : '0.00';
+      }
+
+      const outHour = document.getElementById('calc-out-per-hour');
+      if (outHour) {
+        outHour.textContent = res.costs.profitPerHour > 0
+          ? `${res.costs.profitPerHour.toFixed(1)} ${cur.symbol}`
+          : '0.00';
+      }
+
+      const outMark = document.getElementById('calc-out-markup');
+      if (outMark) outMark.textContent = `${res.costs.actualMarkupPercent.toFixed(1)}%`;
     },
 
     calcReset() {
-      document.getElementById('calc-weight').value = 50;
-      document.getElementById('calc-hours').value = 2.5;
+      this.calcLoadPreset('3dbenchy');
       document.getElementById('calc-qty').value = 1;
-      document.getElementById('calc-spool-price').value = 700;
-      document.getElementById('calc-labor-hours').value = 0;
-      document.getElementById('calc-hardware').value = 0;
-      document.getElementById('calc-postprocess').value = 0;
       document.getElementById('calc-packaging').value = 0;
       document.getElementById('calc-shipping').value = 0;
-      const lenEl = document.getElementById('calc-length-mm');
-      if (lenEl) lenEl.value = '';
+      document.getElementById('calc-hardware').value = 0;
       this.calcUpdate();
     },
 
     calcSaveAsQuote() {
-      if (!this._lastCalcResult) { this.calcUpdate(); }
-      const r = this._lastCalcResult;
+      if (!this._lastIntegratedCalcResult) this.calcUpdate();
+      const r = this._lastIntegratedCalcResult;
       if (!r) return;
+
       document.getElementById('order-is-quote').value = 'true';
-      document.getElementById('modal-order-title').textContent = 'إنشاء عرض سعر من الحاسبة';
-      document.getElementById('order-item-name').value = 'قطعة مخصصة';
-      document.getElementById('order-item-weight').value = r.partWeight;
-      document.getElementById('order-item-hours').value = r.printHours;
-      document.getElementById('order-item-qty').value = r.quantity;
-      document.getElementById('order-margin-pct').value = r.actualMarginPercent;
+      document.getElementById('modal-order-title').textContent = `إنشاء عرض سعر: ${this._modelGeometry.name}`;
+      document.getElementById('order-item-name').value = this._modelGeometry.name || 'قطعة طباعة مخصصة';
+      document.getElementById('order-item-weight').value = r.mass.singlePieceTotalGrams;
+      document.getElementById('order-item-hours').value = r.time.printHoursPerPiece;
+      document.getElementById('order-item-qty').value = r.nesting.quantity;
+      document.getElementById('order-margin-pct').value = r.costs.targetMarginPercent;
+      document.getElementById('order-shipping-fee').value = r.batch.shippingFee || 0;
+
       this.openModal('modal-order');
       this.recalcOrderModal();
     },
 
     calcCopyWhatsapp() {
-      if (!this._lastCalcResult) this.calcUpdate();
-      const r = this._lastCalcResult;
+      if (!this._lastIntegratedCalcResult) this.calcUpdate();
+      const r = this._lastIntegratedCalcResult;
       if (!r) return;
-      const text = `🖨️ *ELMALHY.3D — عرض سعر قطعة طباعة ثلاثية الأبعاد*\n\nالوزن: ${r.partWeight} جرام | وقت الطباعة: ${r.printHours} ساعة\n💰 سعر القطعة: ${r.finalUnitPrice} ج.م\n📦 إجمالي الطلبية (الكمية ×${r.quantity}): ${r.batchTotalPrice} ج.م\n\nللطلب والاستفسار يرجى الرد على هذه الرسالة 🤝`;
+
+      const cur = r.currency.symbol;
+      const name = this._modelGeometry.name || 'قطعة 3D';
+      const text =
+        `🏭 *ELMALHY.3D — عرض سعر تصنيع طباعة ثلاثية الأبعاد*\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `📦 *القطعة:* ${name}\n` +
+        `🧵 *الخامة:* ${r.material.name} (${r.material.fullName})\n` +
+        `⚖️ *الوزن:* ${r.mass.singlePieceTotalGrams}g (صافي: ${r.mass.netModelMassGrams}g)\n` +
+        `⏱️ *زمن الطباعة:* ${r.time.formattedDuration}\n` +
+        `🔢 *الكمية:* ${r.nesting.quantity} قطعة (${r.nesting.platesNeeded} ألواح طباعة)\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `💰 *سعر القطعة الواحدة:* ${r.costs.suggestedRetailPrice} ${cur}\n` +
+        `📦 *إجمالي الطلبية بالكامل:* ${r.batch.batchTotalPrice} ${cur}\n` +
+        `━━━━━━━━━━━━━━━━━━━━\n` +
+        `للطلب وتأكيد الإنتاج، يرجى الرد على هذه الرسالة 🤝`;
+
       if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(text).then(() => {
-          alert('تم نسخ رسالة الواتساب بنجاح! يمكنك لصقها الآن في المحادثة.');
+          alert('تم نسخ رسالة الواتساب بنجاح! يمكنك لصقها وإرسالها للعميل.');
         }).catch(() => {
           prompt('انسخ الرسالة التالية:', text);
         });
       } else {
         prompt('انسخ الرسالة التالية:', text);
       }
+    },
+
+    calcOpenSummaryModal() {
+      if (!this._lastIntegratedCalcResult) this.calcUpdate();
+      const r = this._lastIntegratedCalcResult;
+      if (!r) return;
+
+      const cur = r.currency.symbol;
+      const content = `
+        <div style="background:var(--bg-primary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:16px; margin-bottom:16px">
+          <h4 style="color:var(--accent); margin-bottom:6px">🏭 ورشة ELMALHY.3D — تقرير مواصفات التصنيع والتسعير</h4>
+          <p style="font-size:0.8rem; color:var(--text-muted)">نموذج: <strong>${this._modelGeometry.name}</strong> • تم حسابه في: ${new Date().toLocaleDateString('ar-EG')}</p>
+        </div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px">
+          <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:var(--radius-sm)">
+            <h5 style="color:var(--accent-2); margin-bottom:4px">📐 المواصفات الفنية</h5>
+            <div>• الأبعاد: ${this._modelGeometry.dimensions.width} × ${this._modelGeometry.dimensions.depth} × ${this._modelGeometry.dimensions.height} مم</div>
+            <div>• الحجم المصمت: ${(r.geometry.solidVolumeMm3 / 1000).toFixed(2)} cm³</div>
+            <div>• الخامة: ${r.material.name} (كثافة: ${r.material.density} g/cm³)</div>
+            <div>• الحشو والجدران: ${r.geometry.infillPercent}% • ${r.geometry.wallCount} جدران</div>
+            <div>• الدعامات: ${r.mass.supportMassGrams}g (${r.geometry.layerCount} طبقة)</div>
+          </div>
+          <div style="background:rgba(0,0,0,0.2); padding:12px; border-radius:var(--radius-sm)">
+            <h5 style="color:var(--green); margin-bottom:4px">💰 الحسابات المالية</h5>
+            <div>• تكلفة المواد والهدر: ${r.costs.totalMaterialCost} ${cur}</div>
+            <div>• تكلفة الكهرباء والإهلاك: ${(r.costs.powerCost + r.costs.depreciationCost).toFixed(2)} ${cur}</div>
+            <div>• تكلفة العمالة والصيانة: ${(r.costs.laborCostPerPiece + r.costs.maintenanceCost).toFixed(2)} ${cur}</div>
+            <div>• احتياطي المخاطر: ${r.costs.failureRiskBuffer} ${cur}</div>
+            <div>• <strong>إجمالي التكلفة للقطعة: ${r.costs.totalManufacturingCost} ${cur}</strong></div>
+          </div>
+        </div>
+        <div style="background:linear-gradient(135deg, rgba(56,189,248,0.12), rgba(45,212,191,0.08)); border:1px solid var(--border-bright); padding:14px; border-radius:var(--radius-sm); display:flex; justify-content:space-between; align-items:center">
+          <div>
+            <div style="font-size:0.8rem; color:var(--text-muted)">سعر بيع القطعة المقترح:</div>
+            <div style="font-size:1.5rem; font-weight:800; color:var(--accent-2)">${r.costs.suggestedRetailPrice} ${cur}</div>
+          </div>
+          <div>
+            <div style="font-size:0.8rem; color:var(--text-muted)">إجمالي الباتش (${r.nesting.quantity} قطع):</div>
+            <div style="font-size:1.5rem; font-weight:800; color:var(--green)">${r.batch.batchTotalPrice} ${cur}</div>
+          </div>
+        </div>
+      `;
+
+      const target = document.getElementById('calc-summary-content');
+      if (target) target.innerHTML = content;
+      this.openModal('modal-calc-summary');
     }
   };
 

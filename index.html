@@ -547,208 +547,425 @@
       </div>
     </section>
 
-    <!-- تبويب حاسبة التسعير المتكاملة -->
+    <!-- تبويب حاسبة التسعير المتكاملة (Geniady 3D Engine Integrated) -->
     <section id="tab-calculator" class="tab-pane">
       <div class="top-bar">
         <div class="page-title">
-          <h1>🧮 حاسبة تسعير الطباعة ثلاثية الأبعاد</h1>
-          <p>احسب تكلفة وسعر بيع أي قطعة بدقة — تستخدم إعدادات طابعتك وأسعار المخزون الحالية تلقائياً</p>
+          <h1>🧮 حاسبة تسعير الطباعة ثلاثية الأبعاد المتقدمة</h1>
+          <p>محرك حساب شامل: تشريح الحجم، خامات الدعم، هدر الألوان، رص القطع على السطح، وتحليل ملفات STL ثلاثية الأبعاد</p>
         </div>
         <div class="top-actions">
-          <button class="btn btn-success" onclick="App.calcSaveAsQuote()">💾 حفظ كعرض سعر جديد</button>
+          <button class="btn btn-success" onclick="App.calcSaveAsQuote()">💾 حفظ كعرض سعر رسمي</button>
+          <button class="btn btn-primary" onclick="App.calcOpenSummaryModal()">📋 ملخص الحسبة والطباعة</button>
           <button class="btn btn-secondary" onclick="App.calcReset()">↺ إعادة تعيين</button>
         </div>
+      </div>
+
+      <!-- شريط اختيار السوق والعملة (Market Selector) -->
+      <div class="market-pills-bar">
+        <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-left:6px">🌍 السوق والعملة:</span>
+        <button type="button" class="market-pill active" data-market="EG" onclick="App.calcSetMarket('EG')">
+          <span>🇪🇬</span><span>مصر (ج.م EGP)</span>
+        </button>
+        <button type="button" class="market-pill" data-market="SA" onclick="App.calcSetMarket('SA')">
+          <span>🇸🇦</span><span>السعودية (ر.س SAR)</span>
+        </button>
+        <button type="button" class="market-pill" data-market="AE" onclick="App.calcSetMarket('AE')">
+          <span>🇦🇪</span><span>الإمارات (د.إ AED)</span>
+        </button>
+        <button type="button" class="market-pill" data-market="US" onclick="App.calcSetMarket('US')">
+          <span>🇺🇸</span><span>الولايات المتحدة ($ USD)</span>
+        </button>
+        <button type="button" class="market-pill" data-market="EU" onclick="App.calcSetMarket('EU')">
+          <span>🇪🇺</span><span>أوروبا (€ EUR)</span>
+        </button>
+        <button type="button" class="market-pill" data-market="GB" onclick="App.calcSetMarket('GB')">
+          <span>🇬🇧</span><span>بريطانيا (£ GBP)</span>
+        </button>
       </div>
 
       <div class="calc-layout">
         <!-- إدخالات الحاسبة -->
         <div>
-          <!-- الخامة والوزن -->
+          <!-- 1. معرض النماذج الجاهزة ورفع ملف STL -->
           <div class="calc-panel" style="margin-bottom:18px">
-            <div class="calc-section-title">📦 الخامة ومواصفات القطعة</div>
+            <div class="calc-section-title">
+              <span>📐 النماذج الجاهزة وتحليل ملفات STL</span>
+              <span class="chip" style="margin-right:auto">3D Engine</span>
+            </div>
+
+            <!-- كروت النماذج الجاهزة -->
+            <div class="model-preset-grid">
+              <button type="button" class="model-preset-card active" data-preset="3dbenchy" onclick="App.calcLoadPreset('3dbenchy')">
+                <div class="model-preset-title"><span>🚤</span><span>#3DBenchy Boat</span></div>
+                <div class="model-preset-meta">60 × 31 × 48 مم • 11.3 cm³</div>
+              </button>
+              <button type="button" class="model-preset-card" data-preset="multicolor-benchy" onclick="App.calcLoadPreset('multicolor-benchy')">
+                <div class="model-preset-title"><span>🎨</span><span>Multi-Color Benchy</span></div>
+                <div class="model-preset-meta">48 تبديلة لون • Prime Tower</div>
+              </button>
+              <button type="button" class="model-preset-card" data-preset="large-hex-vase" onclick="App.calcLoadPreset('large-hex-vase')">
+                <div class="model-preset-title"><span>🏺</span><span>Large Hex Vase</span></div>
+                <div class="model-preset-meta">95 × 95 × 160 مم • Vase Mode</div>
+              </button>
+              <button type="button" class="model-preset-card" data-preset="voron-housing" onclick="App.calcLoadPreset('voron-housing')">
+                <div class="model-preset-title"><span>🖨️</span><span>Voron 2.4 Housing</span></div>
+                <div class="model-preset-meta">120 × 85 × 45 مم • ABS ميكانيكي</div>
+              </button>
+            </div>
+
+            <!-- منطقة رفع ملف STL من الجهاز -->
+            <div class="stl-dropzone" id="stl-dropzone" onclick="document.getElementById('stl-file-input').click()">
+              <input type="file" id="stl-file-input" accept=".stl,.STL" style="display:none" onchange="App.calcHandleFileUpload(event)">
+              <div style="font-size:24px">📂</div>
+              <div style="font-weight:700; font-size:0.9rem">اضغط هنا لرفع ملف STL من جهازك أو اسحبه وأفلته هنا</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">تحليل فوري دقيق للأبعاد والحجم والمثلثات والوزن دون الحاجة لبرامج خارجية</div>
+            </div>
+
+            <!-- شاشة العرض ثلاثي الأبعاد WebGL Viewport -->
+            <div class="calc-3d-viewport" id="calc-viewport-container">
+              <canvas id="calc-3d-canvas" class="calc-3d-canvas"></canvas>
+              <div class="viewport-controls-bar">
+                <span class="viewport-pill" id="viewport-model-name">🚤 #3DBenchy Boat</span>
+                <div style="display:flex; gap:6px; pointer-events:auto">
+                  <button type="button" class="viewport-btn" onclick="App.calcToggleWireframe()">🕸️ الشبك (Wireframe)</button>
+                  <button type="button" class="viewport-btn" onclick="App.calcResetCamera()">🔄 ضبط الزاوية</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- بار مواصفات الموديل الفورية -->
+            <div class="stl-metrics-bar" id="stl-metrics-bar">
+              <div>الأبعاد: <strong id="m-metric-dim">60 × 31 × 48 مم</strong></div>
+              <div>الحجم المصمت: <strong id="m-metric-vol">11.35 cm³</strong></div>
+              <div>المساحة السطحية: <strong id="m-metric-area">84.0 cm²</strong></div>
+              <div>المثلثات: <strong id="m-metric-tri">12,500</strong></div>
+            </div>
+          </div>
+
+          <!-- 2. رص القطع على سطح الطباعة والكميات (Batch & Bed Nesting) -->
+          <div class="calc-panel" style="margin-bottom:18px">
+            <div class="calc-section-title">
+              <span>📦 الكميات وسعة سطح الطباعة (Batch Nesting)</span>
+              <span class="chip" id="chip-bed-size">سطح الطابعة: 225 × 225 مم</span>
+            </div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">نوع الخامة (Material)</label>
+                <label class="form-label">الكمية المطلوبة (Quantity)</label>
+                <div class="qty-stepper">
+                  <button type="button" class="qty-stepper-btn" onclick="App.calcStepQty(-1)">−</button>
+                  <input type="number" id="calc-qty" class="qty-stepper-input" value="1" min="1" max="10000" oninput="App.calcUpdate()">
+                  <button type="button" class="qty-stepper-btn" onclick="App.calcStepQty(1)">+</button>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">
+                  القطع لكل لوح طباعة (Pieces / Plate)
+                  <button type="button" class="btn btn-xs btn-ghost" style="float:left; padding:1px 6px" onclick="App.calcAutoNesting()">⚡ حساب تلقائي</button>
+                </label>
+                <input type="number" id="calc-pieces-per-plate" class="form-control" value="8" min="1" oninput="App.calcUpdate()">
+              </div>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:var(--radius-sm); font-size:0.8rem">
+              <span>عدد الألواح المطلوبة للإنتاج: <strong id="calc-out-plates" style="color:var(--accent)">1 لوح</strong></span>
+              <span>سعة السطح المقدرة تلقائياً: <strong id="calc-out-auto-capacity">8 قطع</strong></span>
+            </div>
+          </div>
+
+          <!-- 3. الخامة ومعلمات التقطيع (Slicing & Infill) -->
+          <div class="calc-panel" style="margin-bottom:18px">
+            <div class="calc-section-title">🧵 الخامة والتقطيع (Material & Slicing)</div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">نوع خامة الفلمنت</label>
                 <select id="calc-material" class="form-control" onchange="App.onCalcMaterialChange()">
-                  <option value="pla_plus" data-spool="700">PLA+</option>
-                  <option value="pla" data-spool="600">PLA</option>
-                  <option value="petg" data-spool="750">PETG</option>
-                  <option value="abs" data-spool="650">ABS</option>
-                  <option value="tpu" data-spool="950">TPU 95A</option>
-                  <option value="asa" data-spool="900">ASA</option>
+                  <option value="pla_plus">PLA+ (Tough PLA - مقاوم للصدمات)</option>
+                  <option value="pla">PLA (قياسي لديكور والهدايا)</option>
+                  <option value="petg">PETG (مقاوم للحرارة والرطوبة)</option>
+                  <option value="abs">ABS (ميكانيكي قوي ومقاوم للحرارة)</option>
+                  <option value="tpu">TPU 95A (مطاطي مرن للصدمات)</option>
+                  <option value="asa">ASA (مقاوم للشمس UV والأجواء الخارجية)</option>
+                  <option value="nylon">Nylon PA (فائق الصلابة ومقاوم للاحتكاك)</option>
+                  <option value="pc">PC (بولي كربونات فائق المتانة)</option>
                 </select>
               </div>
               <div class="form-group">
-                <label class="form-label">سعر البكرة (ج.م / 1000g)</label>
-                <input type="number" id="calc-spool-price" class="form-control" value="700" step="10" oninput="App.calcUpdate()">
+                <label class="form-label">سعر البكرة للكيلو (<span id="calc-spool-currency">ج.م</span> / 1000g)</label>
+                <input type="number" id="calc-spool-price" class="form-control" value="950" step="5" oninput="App.calcUpdate()">
               </div>
             </div>
+
+            <!-- نسبة الحشو وعدد الجدران -->
+            <div class="form-row" style="align-items:center">
+              <div class="form-group">
+                <label class="form-label">
+                  نسبة الحشو الداخلي (Infill %)
+                  <span class="slider-badge" id="calc-infill-badge">15%</span>
+                </label>
+                <div class="slider-wrapper">
+                  <input type="range" id="calc-infill" min="0" max="100" step="1" value="15" oninput="App.onInfillSliderChange()">
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">عدد الجدران الخارجية (Wall Count)</label>
+                <input type="number" id="calc-walls" class="form-control" min="1" max="12" step="1" value="3" oninput="App.calcUpdate()">
+              </div>
+            </div>
+
+            <!-- الوزن الصافي الناتج -->
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">وزن القطعة (جرام) <span class="form-helper">من برنامج التقطيع Slicer</span></label>
-                <input type="number" id="calc-weight" class="form-control" value="50" step="0.5" oninput="App.calcUpdate()" required>
+                <label class="form-label">وزن القطعة الصافي بعد التقطيع (جرام)</label>
+                <input type="number" id="calc-weight" class="form-control" value="14.1" step="0.1" oninput="App.calcUpdate()">
               </div>
               <div class="form-group">
-                <label class="form-label">الكمية المطلوبة</label>
-                <input type="number" id="calc-qty" class="form-control" value="1" min="1" oninput="App.calcUpdate()">
-              </div>
-            </div>
-            <div class="form-group">
-              <label class="form-label">⚡ تحويل طول الفلمنت لوزن بالجرام (اختياري)</label>
-              <div class="form-row">
-                <input type="number" id="calc-length-mm" class="form-control" placeholder="الطول بالملليمتر (من G-code)" oninput="App.calcConvertLength()">
-                <select id="calc-diameter" class="form-control" onchange="App.calcConvertLength()">
-                  <option value="1.75">قطر Ø 1.75 mm (الافتراضي)</option>
-                  <option value="2.85">قطر Ø 2.85 mm</option>
+                <label class="form-label">ارتفاع الطبقة Layer Height (مم)</label>
+                <select id="calc-layer-height" class="form-control" onchange="App.calcUpdate()">
+                  <option value="0.12">0.12 مم (فائق النعومة - Fine)</option>
+                  <option value="0.16">0.16 مم (دقيق - Optimal)</option>
+                  <option value="0.20" selected>0.20 مم (القياسي - Standard)</option>
+                  <option value="0.28">0.28 مم (طباعة سريعة - Draft)</option>
                 </select>
               </div>
             </div>
           </div>
 
-          <!-- الطباعة والطابعة -->
+          <!-- 4. خامات الدعم وهدر الألوان (Supports & Multi-Color Waste) -->
           <div class="calc-panel" style="margin-bottom:18px">
-            <div class="calc-section-title">🖨️ بيانات الطباعة والطابعة</div>
+            <div class="calc-section-title">🗑️ الدعامات وهدر الألوان المتعددة (Waste Simulator)</div>
+            
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">وقت الطباعة المقدر (ساعات)</label>
-                <input type="number" id="calc-hours" class="form-control" value="2.5" step="0.1" oninput="App.calcUpdate()" required>
+                <label class="form-label">هيكل الدعامات (Support Structure)</label>
+                <select id="calc-support-type" class="form-control" onchange="App.calcUpdate()">
+                  <option value="none">بدون دعامات (0% هدر)</option>
+                  <option value="tree" selected>دعامات شجرية / عضوية Tree (12% هدر)</option>
+                  <option value="normal">دعامات شبكية قياسية Grid (22% هدر)</option>
+                  <option value="custom">نسبة مخصصة (% Custom)</option>
+                </select>
               </div>
-              <div class="form-group">
-                <label class="form-label">معدل الفشل المتوقع (%)</label>
-                <input type="number" id="calc-failure" class="form-control" value="5" min="0" max="50" oninput="App.calcUpdate()">
+              <div class="form-group" id="group-custom-support" style="display:none">
+                <label class="form-label">نسبة الدعم المخصصة (%)</label>
+                <input type="number" id="calc-support-custom" class="form-control" value="15" min="0" max="100" oninput="App.calcUpdate()">
               </div>
             </div>
+
+            <!-- هدر الألوان المتعددة (Multi-Color Purge) -->
+            <div class="toggle-box">
+              <div class="toggle-header" onclick="App.calcToggleMulticolor()">
+                <div style="font-weight:700; font-size:0.85rem; display:flex; align-items:center; gap:8px">
+                  <span>🎨 طباعة متعددة الألوان (Multi-Color Purge / Tower)</span>
+                  <span class="chip" id="chip-multicolor-status">معطل</span>
+                </div>
+                <input type="checkbox" id="calc-multicolor-toggle" style="cursor:pointer" onclick="event.stopPropagation(); App.calcToggleMulticolor()">
+              </div>
+              <div id="multicolor-fields" style="display:none; margin-top:12px">
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">عدد مرات تبديل الألوان (Color Swaps)</label>
+                    <input type="number" id="calc-color-swaps" class="form-control" value="48" min="0" oninput="App.calcUpdate()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">حجم التطهير لكل تبديلة (Flush mm³)</label>
+                    <input type="number" id="calc-flush-vol" class="form-control" value="280" min="50" max="1000" step="10" oninput="App.calcUpdate()">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- شريط ملخص الهدر -->
+            <div style="display:flex; justify-content:space-between; background:rgba(239,68,68,0.08); border:1px solid rgba(239,68,68,0.25); padding:10px 14px; border-radius:var(--radius-sm); font-size:0.8rem">
+              <span>وزن هدر الدعم: <strong id="calc-out-sup-g">1.7g</strong></span>
+              <span>وزن هدر التطهير والبرج: <strong id="calc-out-purge-g">0g</strong></span>
+              <span>إجمالي الهدر: <strong id="calc-out-total-waste-g" style="color:var(--orange)">1.7g (10.8%)</strong></span>
+            </div>
+          </div>
+
+          <!-- 5. بيانات الطابعة وزمن التشغيل الحركي -->
+          <div class="calc-panel" style="margin-bottom:18px">
+            <div class="calc-section-title">🖨️ الطابعة وزمن التشغيل الحركي (Kinematics)</div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">استهلاك الطابعة (kW)</label>
-                <input type="number" id="calc-power" class="form-control" value="0.22" step="0.01" oninput="App.calcUpdate()">
+                <label class="form-label">ملف مواصفات الطابعة</label>
+                <select id="calc-printer-profile" class="form-control" onchange="App.onPrinterProfileChange()">
+                  <option value="neptune_4_pro">Elegoo Neptune 4 Pro (طابعة الورشة الأساسية - 500mm/s)</option>
+                  <option value="high_speed_corexy">High-Speed CoreXY (Bambu P1S/X1C, Voron 2.4, K1)</option>
+                  <option value="modern_bedslinger">Modern Bed-Slinger (Bambu A1, Prusa MK4)</option>
+                  <option value="classic_cartesian">Classic Cartesian (Creality Ender 3 / Kobra)</option>
+                  <option value="custom">Custom Printer (مواصفات مخصصة)</option>
+                </select>
               </div>
               <div class="form-group">
-                <label class="form-label">سعر الكهرباء (ج.م/kWh)</label>
+                <label class="form-label">
+                  زمن طباعة القطعة (ساعات)
+                  <span class="chip" id="chip-time-mode" style="float:left">حساب حركي تلقائي</span>
+                </label>
+                <input type="number" id="calc-hours" class="form-control" value="1.2" step="0.05" oninput="App.calcUpdate()">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">استهلاك الطابعة للكهرباء (Watts)</label>
+                <input type="number" id="calc-power-watts" class="form-control" value="220" step="5" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">سعر كيلوواط الكهرباء (<span class="calc-cur-label">ج.م</span>/kWh)</label>
                 <input type="number" id="calc-elec-rate" class="form-control" value="2.5" step="0.1" oninput="App.calcUpdate()">
               </div>
             </div>
+
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">إهلاك الطابعة (ج.م/ساعة)</label>
-                <input type="number" id="calc-deprec" class="form-control" value="3.67" step="0.1" oninput="App.calcUpdate()">
+                <label class="form-label">قيمة الطابعة للشراء (<span class="calc-cur-label">ج.م</span>)</label>
+                <input type="number" id="calc-printer-cost" class="form-control" value="22000" step="500" oninput="App.calcUpdate()">
               </div>
               <div class="form-group">
-                <label class="form-label">مستهلكات وصيانة (ج.م/ساعة)</label>
-                <input type="number" id="calc-consumables" class="form-control" value="5.0" step="0.5" oninput="App.calcUpdate()">
+                <label class="form-label">العمر الافتراضي للطابعة (ساعات تشغيل)</label>
+                <input type="number" id="calc-lifespan-hours" class="form-control" value="6000" step="500" oninput="App.calcUpdate()">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">معدل الصيانة والمستهلكات (% من الإهلاك)</label>
+                <input type="number" id="calc-maint-rate" class="form-control" value="20" min="0" max="100" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">إهلاك + صيانة لكل ساعة (<span class="calc-cur-label">ج.م</span>/س)</label>
+                <input type="number" id="calc-hourly-machine-rate" class="form-control" value="4.4" step="0.1" readonly style="opacity:0.85">
               </div>
             </div>
           </div>
 
-          <!-- العمالة والإضافات -->
+          <!-- 6. العمالة والتشطيب وهوامش الأرباح -->
           <div class="calc-panel">
-            <div class="calc-section-title">🔧 العمالة والتجهيز والملحقات</div>
+            <div class="calc-section-title">👷 العمالة وهوامش الربح واحتياطي المخاطر</div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">ساعات العمل اليدوي (Labor)</label>
-                <input type="number" id="calc-labor-hours" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
+                <label class="form-label">أجر ساعة العمل اليدوي (<span class="calc-cur-label">ج.م</span>/ساعة)</label>
+                <input type="number" id="calc-labor-rate" class="form-control" value="95" oninput="App.calcUpdate()">
               </div>
               <div class="form-group">
-                <label class="form-label">سعر ساعة العمل (ج.م)</label>
-                <input type="number" id="calc-labor-rate" class="form-control" value="50" oninput="App.calcUpdate()">
+                <label class="form-label">وقت التجهيز لكل لوح / والتشطيب للقطعة (دقائق)</label>
+                <div style="display:flex; gap:8px">
+                  <input type="number" id="calc-prep-mins" class="form-control" placeholder="تجهيز اللوح" value="5" title="تجهيز اللوح بالدقائق" oninput="App.calcUpdate()">
+                  <input type="number" id="calc-post-mins" class="form-control" placeholder="تشطيب القطعة" value="5" title="تشطيب القطعة بالدقائق" oninput="App.calcUpdate()">
+                </div>
               </div>
             </div>
+
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">تكلفة الملحقات (مغناطيس، مسامير...) ج.م</label>
+                <label class="form-label">احتياطي مخاطر فشل الطباعة (%)</label>
+                <input type="number" id="calc-failure" class="form-control" value="7" min="0" max="50" oninput="App.calcUpdate()">
+              </div>
+              <div class="form-group">
+                <label class="form-label">هامش الربح المستهدف (Target Margin %)</label>
+                <input type="number" id="calc-margin" class="form-control" value="45" min="1" max="95" oninput="App.calcUpdate()">
+              </div>
+            </div>
+
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">تكلفة الملحقات والتشطيب (مسامير، مغناطيس، دهان)</label>
                 <input type="number" id="calc-hardware" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
               </div>
               <div class="form-group">
-                <label class="form-label">تكلفة التشطيب والدهان (ج.م)</label>
-                <input type="number" id="calc-postprocess" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
+                <label class="form-label">التغليف والشحن (<span class="calc-cur-label">ج.م</span>)</label>
+                <div style="display:flex; gap:8px">
+                  <input type="number" id="calc-packaging" class="form-control" placeholder="تغليف" value="0" oninput="App.calcUpdate()">
+                  <input type="number" id="calc-shipping" class="form-control" placeholder="شحن" value="0" oninput="App.calcUpdate()">
+                </div>
               </div>
             </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">تغليف وملصقات (ج.م)</label>
-                <input type="number" id="calc-packaging" class="form-control" value="0" step="0.5" oninput="App.calcUpdate()">
-              </div>
-              <div class="form-group">
-                <label class="form-label">شحن وتوصيل (ج.م)</label>
-                <input type="number" id="calc-shipping" class="form-control" value="0" oninput="App.calcUpdate()">
-              </div>
-            </div>
-            <div class="form-row">
-              <div class="form-group">
-                <label class="form-label">هامش الربح المستهدف (%)</label>
-                <input type="number" id="calc-margin" class="form-control" value="40" min="1" max="95" oninput="App.calcUpdate()">
-              </div>
-              <div class="form-group">
-                <label class="form-label">حد أدنى لسعر الطلب (ج.م)</label>
-                <input type="number" id="calc-min-price" class="form-control" value="100" oninput="App.calcUpdate()">
-              </div>
+
+            <div class="form-group">
+              <label class="form-label">حد أدنى لسعر الطلب الكامل (<span class="calc-cur-label">ج.م</span>)</label>
+              <input type="number" id="calc-min-price" class="form-control" value="100" oninput="App.calcUpdate()">
             </div>
           </div>
         </div>
 
-        <!-- نتائج الحاسبة -->
+        <!-- 7. بطاقة نتائج التسعير الفورية (Sticky Live Pricing Card) -->
         <div class="calc-result-card">
           <div class="calc-result-header">
-            <h3>💡 نتيجة التسعير الفوري</h3>
-            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:2px">سعر بيع القطعة الواحدة</p>
-            <div class="calc-result-price"><span class="currency">ج.م</span><span id="calc-out-price">0.00</span></div>
+            <div style="display:flex; justify-content:space-between; align-items:center">
+              <h3>💡 سعر البيع المقترح</h3>
+              <span class="chip" id="calc-out-market-badge">🇪🇬 EGP</span>
+            </div>
+            <p style="font-size:0.78rem; color:var(--text-muted); margin-top:2px">للقطعة الواحدة شامل التكلفة وهامش الربح</p>
+            <div class="calc-result-price">
+              <span class="currency" id="calc-out-currency-sym">ج.م</span>
+              <span id="calc-out-price">0.00</span>
+            </div>
           </div>
+
           <div class="calc-result-body">
             <div class="calc-result-row">
-              <span class="r-label">🧵 تكلفة الخامة</span>
-              <span class="r-value" id="calc-out-material">0 ج.م</span>
+              <span class="r-label">🧵 تكلفة الخامة الصافية</span>
+              <span class="r-value" id="calc-out-material">0.00</span>
+            </div>
+            <div class="calc-result-row">
+              <span class="r-label">🗑️ تكلفة الهدر (دعم + تطهير)</span>
+              <span class="r-value" id="calc-out-waste">0.00</span>
             </div>
             <div class="calc-result-row">
               <span class="r-label">⚡ تكلفة الكهرباء</span>
-              <span class="r-value" id="calc-out-power">0 ج.م</span>
+              <span class="r-value" id="calc-out-power">0.00</span>
             </div>
             <div class="calc-result-row">
               <span class="r-label">🔩 إهلاك الطابعة</span>
-              <span class="r-value" id="calc-out-deprec">0 ج.م</span>
+              <span class="r-value" id="calc-out-deprec">0.00</span>
             </div>
             <div class="calc-result-row">
               <span class="r-label">🔧 صيانة ومستهلكات</span>
-              <span class="r-value" id="calc-out-consumables">0 ج.م</span>
+              <span class="r-value" id="calc-out-consumables">0.00</span>
             </div>
             <div class="calc-result-row">
-              <span class="r-label">👷 عمالة وتشطيب</span>
-              <span class="r-value" id="calc-out-labor">0 ج.م</span>
+              <span class="r-label">👷 عمالة وتجهيز وتشطيب</span>
+              <span class="r-value" id="calc-out-labor">0.00</span>
             </div>
             <div class="calc-result-row">
-              <span class="r-label">📦 تغليف وملحقات</span>
-              <span class="r-value" id="calc-out-extras">0 ج.م</span>
+              <span class="r-label">📦 ملحقات وتغليف</span>
+              <span class="r-value" id="calc-out-extras">0.00</span>
             </div>
             <div class="calc-result-row">
-              <span class="r-label">⚠️ احتياطي الفشل</span>
-              <span class="r-value" id="calc-out-failure">0 ج.م</span>
+              <span class="r-label">⚠️ احتياطي مخاطر الفشل</span>
+              <span class="r-value" id="calc-out-failure">0.00</span>
             </div>
             <div class="divider"></div>
             <div class="calc-result-row r-total">
-              <span class="r-label">💰 إجمالي التكلفة</span>
-              <span class="r-value" id="calc-out-total-cost">0 ج.م</span>
+              <span class="r-label">💰 إجمالي تكلفة التصنيع (Unit Cost)</span>
+              <span class="r-value" id="calc-out-total-cost">0.00</span>
             </div>
             <div class="calc-result-row r-margin">
-              <span class="r-label">📈 هامش الربح المحقق</span>
-              <span class="r-value" id="calc-out-margin">0%</span>
+              <span class="r-label">📈 هامش الربح المستهدف (Margin)</span>
+              <span class="r-value" id="calc-out-margin">45%</span>
             </div>
             <div class="calc-result-row" style="color:var(--green)">
-              <span class="r-label">💵 صافي الربح للقطعة</span>
-              <span class="r-value" id="calc-out-profit">0 ج.م</span>
+              <span class="r-label">💵 صافي ربح القطعة الواحدة</span>
+              <span class="r-value" id="calc-out-profit">0.00</span>
             </div>
             <div class="divider"></div>
             <div class="calc-result-row r-total">
-              <span class="r-label">📋 إجمالي الطلبية (<span id="calc-out-qty-label">×1</span>)</span>
-              <span class="r-value" id="calc-out-batch">0 ج.م</span>
+              <span class="r-label">📋 إجمالي الطلبية بالكامل (<span id="calc-out-qty-label">×1</span>)</span>
+              <span class="r-value" id="calc-out-batch">0.00</span>
+            </div>
+            <div class="calc-result-row" style="color:var(--accent)">
+              <span class="r-label">💵 إجمالي أرباح الطلبية الصافية</span>
+              <span class="r-value" id="calc-out-batch-profit">0.00</span>
             </div>
           </div>
+
           <div class="calc-result-footer">
             <div style="display:flex; gap:8px; justify-content:space-between; font-size:0.75rem; color:var(--text-muted); padding-bottom:8px; border-bottom:1px solid var(--border)">
               <span>تكلفة/جرام: <strong id="calc-out-per-gram" style="color:var(--text-primary)">0</strong></span>
-              <span>تكلفة/ساعة: <strong id="calc-out-per-hour" style="color:var(--text-primary)">0</strong></span>
-              <span>Markup: <strong id="calc-out-markup" style="color:var(--accent-2)">0%</strong></span>
+              <span>ربح/ساعة: <strong id="calc-out-per-hour" style="color:var(--accent-2)">0</strong></span>
+              <span>Markup: <strong id="calc-out-markup" style="color:var(--accent)">0%</strong></span>
             </div>
-            <button class="btn btn-success btn-full" onclick="App.calcSaveAsQuote()">📑 حفظ كعرض سعر رسمي</button>
-            <button class="btn btn-secondary btn-full btn-sm" onclick="App.calcCopyWhatsapp()">📱 نسخ كرسالة واتساب للعميل</button>
+            <button class="btn btn-success btn-full" onclick="App.calcSaveAsQuote()">💾 حفظ كعرض سعر رسمي في النظام</button>
+            <button class="btn btn-secondary btn-full btn-sm" onclick="App.calcCopyWhatsapp()">📱 نسخ رسالة واتساب للعميل</button>
           </div>
         </div>
       </div>
@@ -1069,7 +1286,25 @@
     </div>
   </div>
 
+  <!-- Modal ملخص الحسبة والطباعة -->
+  <div id="modal-calc-summary" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3>📋 تقرير تسعير ومواصفات القطعة (ELMALHY.3D)</h3>
+        <button class="modal-close" onclick="App.closeModal('modal-calc-summary')">✕</button>
+      </div>
+      <div id="calc-summary-content" style="padding:14px 0; font-size:0.88rem; line-height:1.8">
+        <!-- يُملأ ديناميكياً بواسطة App.calcOpenSummaryModal() -->
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border); padding-top:14px">
+        <button class="btn btn-secondary" onclick="window.print()">🖨️ طباعة التقرير / PDF</button>
+        <button class="btn btn-success" onclick="App.calcSaveAsQuote()">💾 تحويل لعرض سعر</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
+  <script src="js/vendor/three.min.js"></script>
   <script src="js/core/db.js"></script>
   <script src="js/core/calc.js"></script>
   <script src="js/core/events.js"></script>

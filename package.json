@@ -5,6 +5,6 @@
   "private": true,
   "type": "commonjs",
   "scripts": {
-    "test": "node --test tests/calc.test.js tests/inventory.test.js tests/workflow.test.js tests/reports.test.js"
+    "test": "node --test tests/calc.test.js tests/advanced_calc.test.js tests/inventory.test.js tests/workflow.test.js tests/reports.test.js"
   }
 }

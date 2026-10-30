@@ -1,6 +1,8 @@
 /**
  * ELMALHY.3D Workshop Manager - Core Calculation Engine
- * يعمل في المتصفح ونظام Node.js للاختبارات
+ * حاسبة التسعير المتقدمة ومحرك الحسابات الميدانية
+ * يدعم التقطيع، الدعم، الألوان المتعددة، رص القطع على السطح، وتحليل ملفات STL ثلاثية الأبعاد
+ * هندسة عكسية وتكامل مع Geniady 3D Cost Calculator
  */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
@@ -17,6 +19,11 @@
   };
   const pos = (v, d = 0) => Math.max(0, num(v, d));
 
+  function round(val, dec = 2) {
+    const factor = Math.pow(10, dec);
+    return Math.round((num(val) + Number.EPSILON) * factor) / factor;
+  }
+
   function quantityDiscountPct(tiers, qty) {
     if (!Array.isArray(tiers) || tiers.length === 0) return 0;
     return tiers
@@ -25,7 +32,7 @@
   }
 
   /**
-   * حساب التكلفة التقديرية أو الفعلية للقطعة والطلبية
+   * حساب التكلفة التقديرية أو الفعلية للقطعة والطلبية (النواة المتوافقة 100%)
    * @param {Object} p - مدخلات الحساب
    */
   function calculateCost(p = {}) {
@@ -98,37 +105,35 @@
       finalUnitPrice = minOrderPrice / qty;
     }
 
-    const unitProfit = finalUnitPrice - totalUnitCost;
-    const markupPercent = totalUnitCost > 0 ? (unitProfit / totalUnitCost) * 100 : 0;
+    // الأرباح وهوامش الربح الفعلية
+    const unitProfit = Math.max(0, finalUnitPrice - totalUnitCost);
     const actualMarginPercent = finalUnitPrice > 0 ? (unitProfit / finalUnitPrice) * 100 : 0;
+    const markupPercent = totalUnitCost > 0 ? (unitProfit / totalUnitCost) * 100 : 0;
+
+    // معدل ربح ساعة تشغيل الطابعة
+    const profitPerHour = printHours > 0 ? (unitProfit / printHours) : 0;
 
     // إجماليات الطلبية / الباتش
+    const batchDirectCost = directCost * qty;
     const batchTotalCost = totalUnitCost * qty;
     const batchTotalPrice = finalUnitPrice * qty;
     const batchTotalProfit = unitProfit * qty;
 
-    // 10. إضافات الطلبية الكلية (تصميم CAD، شحن، ضريبة)
-    const cadDesignFee = pos(p.cadDesignHours) * pos(p.cadDesignRatePerHour, 150);
+    // الشحن ورسوم المعاملات والحساب النهائي
     const shippingFee = pos(p.shippingFee);
-    const taxableSubtotal = batchTotalPrice + cadDesignFee;
-    const vatPercent = p.includeVat ? Math.min(100, pos(p.vatPercent, 14)) : 0;
-    const vatAmount = taxableSubtotal * (vatPercent / 100);
-    const grandOrderTotal = taxableSubtotal + vatAmount + shippingFee;
+    const vatPercent = Math.min(100, pos(p.vatPercent));
+    const subtotalAfterDiscount = batchTotalPrice;
+    const vatAmount = subtotalAfterDiscount * (vatPercent / 100);
+    const grandOrderTotal = subtotalAfterDiscount + vatAmount + shippingFee;
 
-    // الدفعات والعربون
+    // الدفعات والمدفوع مقدماً
     const depositPaid = pos(p.depositPaid);
     const remainingBalance = Math.max(0, grandOrderTotal - depositPaid);
 
-    // مقاييس كفاءة
-    const profitPerHour = printHours > 0 ? (unitProfit / printHours) : 0;
-    const totalPrintHours = printHours * qty;
-    const batchProfitPerHour = totalPrintHours > 0 ? (batchTotalProfit / totalPrintHours) : 0;
-
     return {
+      partWeight: round(partWeight, 1),
+      printHours: round(printHours, 2),
       quantity: qty,
-      partWeight,
-      printHours,
-      totalPrintHours,
       materialCost: round(materialCost),
       powerCost: round(powerCost),
       depreciationCost: round(depreciationCost),
@@ -138,31 +143,30 @@
       postProcessCost: round(postProcessCost),
       packagingCost: round(packagingCost),
       setupFeePerUnit: round(setupFeePerUnit),
+      directCost: round(directCost),
       marketingCost: round(marketingCost),
       failureCost: round(failureCost),
       totalUnitCost: round(totalUnitCost),
       baseUnitPrice: round(baseUnitPrice),
-      discountPercent: round(discountPercent),
+      discountPercent: round(discountPercent, 1),
       finalUnitPrice: round(finalUnitPrice),
       unitProfit: round(unitProfit),
-      markupPercent: round(markupPercent, 1),
       actualMarginPercent: round(actualMarginPercent, 1),
+      markupPercent: round(markupPercent, 1),
+      profitPerHour: round(profitPerHour),
       batchTotalCost: round(batchTotalCost),
       batchTotalPrice: round(batchTotalPrice),
       batchTotalProfit: round(batchTotalProfit),
-      cadDesignFee: round(cadDesignFee),
-      shippingFee: round(shippingFee),
       vatAmount: round(vatAmount),
+      shippingFee: round(shippingFee),
       grandOrderTotal: round(grandOrderTotal),
       depositPaid: round(depositPaid),
-      remainingBalance: round(remainingBalance),
-      profitPerHour: round(profitPerHour),
-      batchProfitPerHour: round(batchProfitPerHour)
+      remainingBalance: round(remainingBalance)
     };
   }
 
   /**
-   * مقارنة التكلفة والزمن التقديري مقابل الفعلي
+   * مقارنة التكلفة والربح التقديري بالفعلي بعد اكتمال الطباعة
    */
   function compareEstimatedVsActual(estimated, actual) {
     const est = calculateCost(estimated);
@@ -189,15 +193,367 @@
     };
   }
 
-  function round(val, dec = 2) {
-    const factor = Math.pow(10, dec);
-    return Math.round((num(val) + Number.EPSILON) * factor) / factor;
+  // =========================================================================
+  // ADVANCED CALCULATION ENGINE (REVERSE ENGINEERED FROM GENIADY 3D)
+  // =========================================================================
+
+  /**
+   * حساب حجم القشرة والحشو الداخلي بناء على الحجم وعدد الجدران ونسبة الحشو
+   */
+  function sliceVolume(volumeMm3, infillPercent = 15, wallCount = 3, surfaceAreaMm2 = 0) {
+    const vol = pos(volumeMm3);
+    if (vol <= 0) return { slicedNetVolumeMm3: 0, shellVolumeMm3: 0, infillVolumeMm3: 0, solidVolumeMm3: 0 };
+
+    const infill = Math.max(0, Math.min(100, num(infillPercent, 15)));
+    if (infill >= 100) {
+      return { slicedNetVolumeMm3: vol, shellVolumeMm3: vol, infillVolumeMm3: 0, solidVolumeMm3: vol };
+    }
+
+    if (wallCount <= 1 && infill === 0) {
+      const area = surfaceAreaMm2 > 0 ? surfaceAreaMm2 : 6 * Math.pow(vol, 2 / 3);
+      const estC = Math.pow(vol / 100, 2 / 3) * 16;
+      const shellVal = area * 0.5 * 0.52;
+      const minVal = Math.min(vol * 0.25, Math.max(5200, estC * 1.5));
+      const res = Math.min(vol, shellVal + minVal);
+      return { slicedNetVolumeMm3: res, shellVolumeMm3: res, infillVolumeMm3: 0, solidVolumeMm3: vol };
+    }
+
+    const wallThickness = Math.max(1, wallCount) * 0.45 + 0.35;
+    const surfArea = surfaceAreaMm2 > 0 ? surfaceAreaMm2 : 6 * Math.pow(vol, 2 / 3);
+    const ratio = (surfArea * wallThickness) / (2 * vol);
+
+    let shellRatio;
+    if (ratio >= 1) {
+      shellRatio = Math.min(0.96, 0.5 + 0.45 * Math.min(1, ratio - 1));
+    } else {
+      shellRatio = 1 - Math.pow(1 - ratio, 2.2);
+    }
+
+    const shellVolumeMm3 = Math.min(vol, vol * shellRatio);
+    const infillVolumeMm3 = Math.max(0, vol - shellVolumeMm3) * (infill / 100);
+    const slicedNetVolumeMm3 = shellVolumeMm3 + infillVolumeMm3;
+
+    return {
+      slicedNetVolumeMm3: round(slicedNetVolumeMm3, 1),
+      shellVolumeMm3: round(shellVolumeMm3, 1),
+      infillVolumeMm3: round(infillVolumeMm3, 1),
+      solidVolumeMm3: round(vol, 1)
+    };
+  }
+
+  /**
+   * حساب وزن وحجم خامة الدعم (Supports)
+   */
+  function calculateSupportWaste(volumeMm3, supportType = 'none', customPercent = 15, manualSupportVolumeMm3) {
+    const vol = pos(volumeMm3);
+    if (manualSupportVolumeMm3 !== undefined && manualSupportVolumeMm3 !== null && manualSupportVolumeMm3 >= 0) {
+      const supVol = num(manualSupportVolumeMm3);
+      const pct = vol > 0 ? (supVol / vol) * 100 : 0;
+      return { supportVolumeMm3: round(supVol, 1), supportWastePercent: round(pct, 1) };
+    }
+
+    switch (supportType) {
+      case 'tree': {
+        const pct = 12;
+        return { supportVolumeMm3: round(vol * (pct / 100), 1), supportWastePercent: pct };
+      }
+      case 'normal':
+      case 'grid': {
+        const pct = 22;
+        return { supportVolumeMm3: round(vol * (pct / 100), 1), supportWastePercent: pct };
+      }
+      case 'custom': {
+        const pct = Math.max(0, num(customPercent, 15));
+        return { supportVolumeMm3: round(vol * (pct / 100), 1), supportWastePercent: pct };
+      }
+      case 'none':
+      default:
+        return { supportVolumeMm3: 0, supportWastePercent: 0 };
+    }
+  }
+
+  /**
+   * حساب هدر الألوان المتعددة (Multi-Color Purge / Prime Tower)
+   */
+  function calculateMultiColorWaste(cfg = {}, layerCount = 1, layerHeightMm = 0.2) {
+    if (!cfg.enabled || num(cfg.colorSwapsCount) <= 0) {
+      return { flushVolumeMm3: 0, primeTowerVolumeMm3: 0, totalMultiColorWasteVolumeMm3: 0 };
+    }
+
+    const flushPerSwap = num(cfg.flushVolumePerSwapMm3, 300);
+    const flushVolumeMm3 = num(cfg.colorSwapsCount) * flushPerSwap;
+
+    let primeTowerVolumeMm3 = 0;
+    if (cfg.primeTowerEnabled !== false) {
+      if (cfg.manualPrimeTowerVolumeMm3 !== undefined && cfg.manualPrimeTowerVolumeMm3 >= 0) {
+        primeTowerVolumeMm3 = num(cfg.manualPrimeTowerVolumeMm3);
+      } else {
+        const footprint = num(cfg.primeTowerFootprintAreaMm2, 225); // 15x15mm default
+        const densityFactor = num(cfg.primeTowerDensityFactor, 0.25);
+        const height = Math.max(1, layerCount) * Math.max(0.05, layerHeightMm);
+        primeTowerVolumeMm3 = footprint * height * densityFactor;
+      }
+    }
+
+    return {
+      flushVolumeMm3: round(flushVolumeMm3, 1),
+      primeTowerVolumeMm3: round(primeTowerVolumeMm3, 1),
+      totalMultiColorWasteVolumeMm3: round(flushVolumeMm3 + primeTowerVolumeMm3, 1)
+    };
+  }
+
+  /**
+   * محاكاة رص القطع على مساحة سطح الطباعة وحساب عدد الألواح (Plates)
+   */
+  function calculatePlateNesting(footprintMm = { x: 50, y: 50 }, heightMm = 50, bedSizeMm = { x: 256, y: 256, z: 256 }, hasPrimeTower = false) {
+    if (num(heightMm) > num(bedSizeMm.z, 256)) return 0;
+    const fx = pos(footprintMm?.x, 50);
+    const fy = pos(footprintMm?.y, 50);
+    if (fx <= 0 || fy <= 0) return 1;
+
+    const gap = 5; // mm spacing between parts
+    const primeTowerAllowance = hasPrimeTower ? 35 : 0;
+    const bedX = Math.max(10, num(bedSizeMm.x, 256) - primeTowerAllowance);
+    const bedY = Math.max(10, num(bedSizeMm.y, 256));
+
+    const fit = (w, d) => Math.max(0, Math.floor((bedX + gap) / (w + gap))) * Math.max(0, Math.floor((bedY + gap) / (d + gap)));
+    const maxPieces = Math.max(1, Math.max(fit(fx, fy), fit(fy, fx)));
+    return maxPieces;
+  }
+
+  /**
+   * تخمين زمن الطباعة الحركي بناء على سرعة التدفق وتسارع الطابعة أو التجاوز اليدوي
+   */
+  function estimatePrintTime(options = {}) {
+    if (options.manualOverride) {
+      const h = pos(options.manualHours, 0);
+      const m = pos(options.manualMinutes, 0);
+      const totalSec = h * 3600 + m * 60;
+      return {
+        totalTimeSeconds: totalSec,
+        totalTimeHours: round(totalSec / 3600, 2),
+        formattedDuration: formatSeconds(totalSec),
+        isManualOverride: true
+      };
+    }
+
+    const netVol = pos(options.netVolumeMm3);
+    const supVol = pos(options.supportVolumeMm3);
+    const towerVol = pos(options.primeTowerVolumeMm3);
+    const totalExtrusionVol = netVol + supVol + towerVol;
+
+    const maxFlow = pos(options.maxVolumetricFlowMm3PerS, 18);
+    const kinematicEff = Math.max(0.2, Math.min(0.95, pos(options.kinematicEfficiency, 0.7)));
+    const effectiveFlow = maxFlow * kinematicEff;
+
+    const layerCount = Math.max(1, pos(options.layerCount, 1));
+    const volPerLayer = totalExtrusionVol / layerCount;
+    const extrusionSecPerLayer = effectiveFlow > 0 ? (volPerLayer / effectiveFlow) : 0;
+
+    const layerChangeSec = num(options.layerChangeOverheadSeconds, 2.5);
+    const totalExtrusionSec = layerCount * Math.max(layerChangeSec, extrusionSecPerLayer);
+    const layerOverheadSec = layerCount * layerChangeSec;
+
+    let toolChangeSec = 0;
+    if (options.colorSwapsCount > 0) {
+      const toolSec = num(options.toolChangeOverheadSeconds, 70);
+      toolChangeSec = options.colorSwapsCount * toolSec;
+    }
+
+    const warmupSec = pos(options.preheatWarmupMinutes, 5) * 60;
+    const totalSec = totalExtrusionSec + layerOverheadSec + toolChangeSec + warmupSec;
+
+    return {
+      extrusionTimeSeconds: Math.round(totalExtrusionSec),
+      layerOverheadSeconds: Math.round(layerOverheadSec),
+      toolChangeTimeSeconds: Math.round(toolChangeSec),
+      preheatWarmupSeconds: Math.round(warmupSec),
+      totalTimeSeconds: Math.round(totalSec),
+      totalTimeHours: round(totalSec / 3600, 2),
+      formattedDuration: formatSeconds(totalSec),
+      isManualOverride: false
+    };
+  }
+
+  function formatSeconds(sec) {
+    const s = Math.max(0, Math.round(sec));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const remS = s % 60;
+    if (h > 0) return `${h}h ${m}m`;
+    if (m > 0) return `${m}m ${remS}s`;
+    return `${remS}s`;
+  }
+
+  /**
+   * محلل ملفات STL ثلاثية الأبعاد (Binary & ASCII STL Parser)
+   * يحسب الحجم والسطح والأبعاد وعدد المثلثات
+   * @param {ArrayBuffer|Buffer} buffer
+   */
+  function parseSTL(buffer) {
+    const dataView = new DataView(buffer instanceof ArrayBuffer ? buffer : buffer.buffer, buffer.byteOffset || 0, buffer.byteLength);
+    const byteLength = dataView.byteLength;
+    if (byteLength < 84) {
+      throw new Error('Invalid STL file: size too small');
+    }
+
+    // فحص ما إذا كان الملف Binary أو ASCII
+    let isBinary = true;
+    const expectedTriangles = dataView.getUint32(80, true);
+    const expectedBinarySize = 84 + expectedTriangles * 50;
+
+    if (byteLength !== expectedBinarySize) {
+      // قد يكون ASCII، نتحقق من أول 100 حرف
+      const textHeader = new TextDecoder('ascii').decode(new Uint8Array(buffer, 0, Math.min(byteLength, 128)));
+      if (textHeader.trim().toLowerCase().startsWith('solid') && !textHeader.includes('\0')) {
+        isBinary = false;
+      }
+    }
+
+    if (isBinary) {
+      return parseBinarySTL(dataView, expectedTriangles);
+    } else {
+      const text = new TextDecoder('utf-8').decode(buffer);
+      return parseAsciiSTL(text);
+    }
+  }
+
+  function parseBinarySTL(dv, triangleCount) {
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    let signedVolume = 0;
+    let surfaceArea = 0;
+
+    let offset = 84;
+    const totalTris = Math.min(triangleCount, Math.floor((dv.byteLength - 84) / 50));
+
+    for (let i = 0; i < totalTris; i++) {
+      // Normal vector (skipped, 12 bytes)
+      offset += 12;
+
+      // Vertex 1
+      const x1 = dv.getFloat32(offset, true); offset += 4;
+      const y1 = dv.getFloat32(offset, true); offset += 4;
+      const z1 = dv.getFloat32(offset, true); offset += 4;
+
+      // Vertex 2
+      const x2 = dv.getFloat32(offset, true); offset += 4;
+      const y2 = dv.getFloat32(offset, true); offset += 4;
+      const z2 = dv.getFloat32(offset, true); offset += 4;
+
+      // Vertex 3
+      const x3 = dv.getFloat32(offset, true); offset += 4;
+      const y3 = dv.getFloat32(offset, true); offset += 4;
+      const z3 = dv.getFloat32(offset, true); offset += 4;
+
+      // Attribute byte count (2 bytes)
+      offset += 2;
+
+      // Bounding box
+      minX = Math.min(minX, x1, x2, x3); maxX = Math.max(maxX, x1, x2, x3);
+      minY = Math.min(minY, y1, y2, y3); maxY = Math.max(maxY, y1, y2, y3);
+      minZ = Math.min(minZ, z1, z2, z3); maxZ = Math.max(maxZ, z1, z2, z3);
+
+      // Signed volume of tetrahedron
+      signedVolume += (x1 * (y2 * z3 - y3 * z2) - y1 * (x2 * z3 - x3 * z2) + z1 * (x2 * y3 - x3 * y2)) / 6;
+
+      // Triangle surface area (Cross product)
+      const ax = x2 - x1, ay = y2 - y1, az = z2 - z1;
+      const bx = x3 - x1, by = y3 - y1, bz = z3 - z1;
+      const cx = ay * bz - az * by;
+      const cy = az * bx - ax * bz;
+      const cz = ax * by - ay * bx;
+      surfaceArea += 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+    }
+
+    const width = maxX > minX ? (maxX - minX) : 0;
+    const depth = maxY > minY ? (maxY - minY) : 0;
+    const height = maxZ > minZ ? (maxZ - minZ) : 0;
+    const volumeMm3 = Math.abs(signedVolume);
+
+    return {
+      triangleCount: totalTris,
+      vertexCount: totalTris * 3,
+      dimensions: {
+        width: round(width, 2),
+        depth: round(depth, 2),
+        height: round(height, 2)
+      },
+      volumeMm3: round(volumeMm3, 2),
+      volumeCm3: round(volumeMm3 / 1000, 3),
+      surfaceAreaMm2: round(surfaceArea, 2),
+      surfaceAreaCm2: round(surfaceArea / 100, 2)
+    };
+  }
+
+  function parseAsciiSTL(text) {
+    const vertexRegex = /vertex\s+([+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?)\s+([+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?)\s+([+-]?\d*(?:\.\d+)?(?:[eE][+-]?\d+)?)/gi;
+    let match;
+    const vertices = [];
+
+    while ((match = vertexRegex.exec(text)) !== null) {
+      vertices.push({
+        x: parseFloat(match[1]),
+        y: parseFloat(match[2]),
+        z: parseFloat(match[3])
+      });
+    }
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    let signedVolume = 0;
+    let surfaceArea = 0;
+    const totalTris = Math.floor(vertices.length / 3);
+
+    for (let i = 0; i < totalTris; i++) {
+      const v1 = vertices[i * 3];
+      const v2 = vertices[i * 3 + 1];
+      const v3 = vertices[i * 3 + 2];
+
+      minX = Math.min(minX, v1.x, v2.x, v3.x); maxX = Math.max(maxX, v1.x, v2.x, v3.x);
+      minY = Math.min(minY, v1.y, v2.y, v3.y); maxY = Math.max(maxY, v1.y, v2.y, v3.y);
+      minZ = Math.min(minZ, v1.z, v2.z, v3.z); maxZ = Math.max(maxZ, v1.z, v2.z, v3.z);
+
+      signedVolume += (v1.x * (v2.y * v3.z - v3.y * v2.z) - v1.y * (v2.x * v3.z - v3.x * v2.z) + v1.z * (v2.x * v3.y - v3.x * v2.y)) / 6;
+
+      const ax = v2.x - v1.x, ay = v2.y - v1.y, az = v2.z - v1.z;
+      const bx = v3.x - v1.x, by = v3.y - v1.y, bz = v3.z - v1.z;
+      const cx = ay * bz - az * by;
+      const cy = az * bx - ax * bz;
+      const cz = ax * by - ay * bx;
+      surfaceArea += 0.5 * Math.sqrt(cx * cx + cy * cy + cz * cz);
+    }
+
+    const width = maxX > minX ? (maxX - minX) : 0;
+    const depth = maxY > minY ? (maxY - minY) : 0;
+    const height = maxZ > minZ ? (maxZ - minZ) : 0;
+    const volumeMm3 = Math.abs(signedVolume);
+
+    return {
+      triangleCount: totalTris,
+      vertexCount: totalTris * 3,
+      dimensions: {
+        width: round(width, 2),
+        depth: round(depth, 2),
+        height: round(height, 2)
+      },
+      volumeMm3: round(volumeMm3, 2),
+      volumeCm3: round(volumeMm3 / 1000, 3),
+      surfaceAreaMm2: round(surfaceArea, 2),
+      surfaceAreaCm2: round(surfaceArea / 100, 2)
+    };
   }
 
   return {
     calculateCost,
     compareEstimatedVsActual,
     quantityDiscountPct,
-    round
+    round,
+    sliceVolume,
+    calculateSupportWaste,
+    calculateMultiColorWaste,
+    calculatePlateNesting,
+    estimatePrintTime,
+    parseSTL
   };
 });
