@@ -41,6 +41,11 @@
 
     switchTab(tabId) {
       this.currentTab = tabId;
+      // Close mobile sidebar on tab switch
+      const sidebar = document.querySelector('.sidebar');
+      const overlay = document.getElementById('mobile-overlay');
+      if (sidebar) sidebar.classList.remove('mobile-open');
+      if (overlay) overlay.classList.remove('active');
       document.querySelectorAll('.nav-item').forEach(it => {
         it.classList.toggle('active', it.dataset.tab === tabId);
       });
@@ -513,8 +518,10 @@
       const postCost = Number(document.getElementById('order-postprocess-cost').value) || 0;
       const shipping = Number(document.getElementById('order-shipping-fee').value) || 0;
       const deposit = Number(document.getElementById('order-deposit-paid').value) || 0;
+      const notes = document.getElementById('order-notes')?.value.trim() || '';
 
       const order = Orders.createOrder({
+        notes: notes,
         customerName: custName,
         customerPhone: custPhone,
         isQuotation: isQuote,
@@ -1650,6 +1657,8 @@
     // ==========================================
     // Printable Invoice Modal (A4 / PDF)
     // ==========================================
+    renderPrintableInvoice() { return this.openPrintableInvoice(); },
+
     openPrintableInvoice() {
       if (!this._lastIntegratedCalcResult) this.calcUpdate();
       const r = this._lastIntegratedCalcResult;

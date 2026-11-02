@@ -11,6 +11,8 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2226%22 font-size=%2226%22>🖨️</text></svg>">
 </head>
 <body>
+  <button class="mobile-menu-btn" id="mobile-menu-btn" onclick="document.querySelector('.sidebar').classList.toggle('mobile-open'); document.getElementById('mobile-overlay').classList.toggle('active')">☰</button>
+  <div class="mobile-overlay" id="mobile-overlay" onclick="document.querySelector('.sidebar').classList.remove('mobile-open'); this.classList.remove('active')"></div>
 
   <!-- القائمة الجانبية -->
   <aside class="sidebar">
@@ -681,7 +683,7 @@
                 <input type="number" id="calc-pieces-per-plate" class="form-control" value="8" min="1" oninput="App.calcUpdate()">
               </div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; background:rgba(0,0,0,0.2); padding:8px 12px; border-radius:var(--radius-sm); font-size:0.8rem">
+            <div style="display:flex; justify-content:space-between; align-items:center; background: var(--bg-secondary); border: 1px solid var(--border); padding:8px 12px; border-radius:var(--radius-sm); font-size:0.8rem">
               <span>عدد الألواح المطلوبة للإنتاج: <strong id="calc-out-plates" style="color:var(--accent)">1 لوح</strong></span>
               <span>سعة السطح المقدرة تلقائياً: <strong id="calc-out-auto-capacity">8 قطع</strong></span>
             </div>
@@ -933,7 +935,10 @@
                 <input type="number" id="calc-failure" class="form-control" value="7" min="0" max="50" oninput="App.calcUpdate()">
               </div>
               <div class="form-group">
-                <label class="form-label">هامش الربح المستهدف (Target Margin %)</label>
+                <label class="form-label" style="display:flex; justify-content:space-between; align-items:center">
+                  <span>هامش الربح المستهدف (Target Margin %)</span>
+                  <span class="badge" id="calc-margin-badge" style="background:#e0f2fe; color:#0284c7; font-size:0.75rem">45%</span>
+                </label>
                 <input type="number" id="calc-margin" class="form-control" value="45" min="1" max="95" oninput="App.calcUpdate()">
               </div>
             </div>
@@ -1298,8 +1303,9 @@
             <div class="roi-progress-fill" id="roi-progress-fill" style="width: 0%"></div>
           </div>
           <div style="font-size:0.78rem; color:var(--text-muted); margin-top:8px; text-align:left">
-            نسبة الاسترداد المحققة: <strong id="roi-progress-pct" style="color:var(--accent)">0%</strong>
+            نسبة الاسترداد المحققة: <strong id="roi-progress-percent" style="color:var(--accent)">0%</strong>
           </div>
+          <p id="roi-recovery-status" style="font-size:0.82rem; color:var(--text-muted); margin-top:8px"></p>
         </div>
       </div>
     </section>
@@ -1597,8 +1603,13 @@
           </div>
         </div>
 
+        <div class="form-group">
+          <label>ملاحظات وتفاصيل إضافية عن الطلب</label>
+          <textarea id="order-notes" class="form-control" rows="2" placeholder="اللون المطلوب، أي إكسسوارات أو متطلبات خاصة..."></textarea>
+        </div>
+
         <!-- معاينة الحساب المباشر -->
-        <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 14px; margin-bottom: 16px;">
+        <div style="background: var(--bg-secondary); border: 1px solid var(--border); border: 1px solid var(--border-color); border-radius: var(--radius); padding: 14px; margin-bottom: 16px;">
           <div style="display: flex; justify-content: space-between; font-size: 0.9rem; margin-bottom: 6px;">
             <span>التكلفة التقديرية للقطعة: <strong id="modal-calc-unit-cost" style="color: var(--accent-orange)">0 ج.م</strong></span>
             <span>سعر البيع المقترح للقطعة: <strong id="modal-calc-unit-price" style="color: var(--accent-green)">0 ج.م</strong></span>
@@ -1725,10 +1736,10 @@
   <div id="modal-product" class="modal-overlay">
     <div class="modal-card">
       <div class="modal-header">
-        <h3>إضافة منتج جديد للكتالوج</h3>
+        <h3 id="modal-product-title">إضافة منتج جديد للكتالوج</h3>
         <button class="modal-close" onclick="App.closeModal('modal-product')">✕</button>
       </div>
-      <form id="add-product-form" onsubmit="App.saveNewProduct(event)">
+      <form id="prod-form" onsubmit="App.saveNewProduct(event)">
         <div class="form-row">
           <div class="form-group">
             <label>اسم المنتج</label>
@@ -1767,6 +1778,20 @@
           </div>
         </div>
 
+        <div class="form-row">
+          <div class="form-group">
+            <label>تكلفة التصنيع (ج.م)</label>
+            <input type="number" id="prod-cost" class="form-control" value="100">
+          </div>
+          <div class="form-group">
+            <label>سعر البيع النهائي (ج.م)</label>
+            <input type="number" id="prod-price" class="form-control" value="250">
+          </div>
+        </div>
+        <div class="form-group">
+          <label>وصف المنتج والملاحظات</label>
+          <textarea id="prod-desc" class="form-control" rows="2" placeholder="ملاحظات إضافية عن المنتج..."></textarea>
+        </div>
         <button type="submit" class="btn btn-primary" style="width: 100%;">حفظ المنتج بالكتالوج</button>
       </form>
     </div>
