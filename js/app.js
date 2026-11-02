@@ -24,6 +24,7 @@
       this.renderCurrentTab();
       this.subscribeEvents();
       this.initCalculator();
+      this.initCustomerOrdersConfig();
       console.log('ELMALHY.3D Workshop Manager initialized successfully.');
     },
 
@@ -74,6 +75,17 @@
           break;
         case 'printer':
           this.renderPrinter();
+          break;
+        case 'assembly':
+          this.renderAssembly();
+          break;
+        case 'roi':
+          this.renderROI();
+          break;
+        case 'customer-orders':
+          this.renderCustomerOrders();
+          break;
+        case 'troubleshoot':
           break;
         case 'backup':
           break;
@@ -794,7 +806,7 @@
       this.calcSetMarket('EG', false);
       this.init3DViewer();
       this.setupSTLDropzone();
-      this.calcLoadPreset('3dbenchy');
+      this.calcLoadDefaultGeometry();
       this.calcUpdate();
     },
 
@@ -808,9 +820,9 @@
         if (ctx) {
           canvas.width = container.clientWidth || 300;
           canvas.height = 240;
-          ctx.fillStyle = '#0e1726';
+          ctx.fillStyle = '#f1f5f9';
           ctx.fillRect(0, 0, canvas.width, canvas.height);
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.2)';
+          ctx.strokeStyle = 'rgba(2, 132, 199, 0.2)';
           ctx.lineWidth = 1;
           for (let x = 20; x < canvas.width; x += 30) {
             ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
@@ -818,7 +830,7 @@
           for (let y = 20; y < canvas.height; y += 30) {
             ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
           }
-          ctx.fillStyle = '#38bdf8';
+          ctx.fillStyle = '#0284c7';
           ctx.font = '13px system-ui, sans-serif';
           ctx.textAlign = 'center';
           ctx.fillText('🖨️ سطح طابعة ورشة ELMALHY.3D', canvas.width / 2, canvas.height / 2);
@@ -831,7 +843,7 @@
         const height = 240;
 
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a101d);
+        scene.background = new THREE.Color(0xf1f5f9);
 
         const camera = new THREE.PerspectiveCamera(45, width / height, 1, 2000);
         camera.position.set(120, -180, 130);
@@ -841,14 +853,18 @@
         renderer.setSize(width, height);
         renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
 
-        const ambLight = new THREE.AmbientLight(0xffffff, 0.65);
+        const ambLight = new THREE.AmbientLight(0xffffff, 0.85);
         scene.add(ambLight);
 
-        const dirLight = new THREE.DirectionalLight(0x38bdf8, 1.2);
+        const dirLight = new THREE.DirectionalLight(0x0284c7, 0.9);
         dirLight.position.set(100, -100, 200);
         scene.add(dirLight);
 
-        const gridHelper = new THREE.GridHelper(225, 15, 0x38bdf8, 0x1f3454);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.5);
+        fillLight.position.set(-100, 100, 100);
+        scene.add(fillLight);
+
+        const gridHelper = new THREE.GridHelper(225, 15, 0x0284c7, 0xcbd5e1);
         gridHelper.rotation.x = Math.PI / 2;
         scene.add(gridHelper);
 
@@ -970,7 +986,13 @@
         const dt = e.dataTransfer;
         const files = dt.files;
         if (files && files.length > 0) {
-          this.calcProcessSTLFile(files[0]);
+          const file = files[0];
+          const ext = file.name.split('.').pop().toLowerCase();
+          if (['gcode', 'gco', 'nc'].includes(ext)) {
+            this.calcProcessGCodeFile(file);
+          } else {
+            this.calcProcessSTLFile(file);
+          }
         }
       });
     },
@@ -978,8 +1000,74 @@
     calcHandleFileUpload(event) {
       const file = event.target.files?.[0];
       if (file) {
-        this.calcProcessSTLFile(file);
+        const ext = file.name.split('.').pop().toLowerCase();
+        if (['gcode', 'gco', 'nc'].includes(ext)) {
+          this.calcProcessGCodeFile(file);
+        } else {
+          this.calcProcessSTLFile(file);
+        }
       }
+    },
+
+    calcProcessGCodeFile(file) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const text = e.target.result;
+          const parsed = root.WorkshopCalc.parseGCode(text);
+          if (!parsed) throw new Error('تعذر قراءة بيانات السلايسر من الملف');
+
+          this._activePresetId = 'custom-gcode';
+          const name = file.name.replace(/\.[^/.]+$/, '');
+          this._modelGeometry = {
+            name: name,
+            solidVolumeMm3: Math.round(parsed.filamentGrams / 1.24 * 1000),
+            surfaceAreaMm2: 0,
+            dimensions: { width: 0, depth: 0, height: 0 },
+            triangleCount: 0
+          };
+
+          const moToggle = document.getElementById('calc-manual-override-toggle');
+          if (moToggle) {
+            moToggle.checked = true;
+            this.calcToggleManualOverride();
+          }
+
+          const weightInput = document.getElementById('calc-manual-weight-input');
+          if (weightInput && parsed.filamentGrams > 0) weightInput.value = parsed.filamentGrams;
+
+          const hours = Math.floor(parsed.printHours);
+          const mins = Math.round((parsed.printHours - hours) * 60);
+          const hInput = document.getElementById('calc-manual-hours-input');
+          const mInput = document.getElementById('calc-manual-mins-input');
+          if (hInput) hInput.value = hours;
+          if (mInput) mInput.value = mins;
+
+          if (parsed.layerHeight) {
+            const lhInput = document.getElementById('calc-layer-height');
+            if (lhInput) lhInput.value = parsed.layerHeight.toFixed(2);
+          }
+
+          const dimEl = document.getElementById('m-metric-dim');
+          const volEl = document.getElementById('m-metric-vol');
+          const areaEl = document.getElementById('m-metric-area');
+          const triEl = document.getElementById('m-metric-tri');
+
+          if (dimEl) dimEl.textContent = 'مسلوس مسبقاً (G-Code)';
+          if (volEl) volEl.textContent = `${parsed.filamentGrams} جم`;
+          if (areaEl) areaEl.textContent = `${hours} س ${mins} د`;
+          if (triEl) triEl.textContent = 'أوامر حركية جاهزة';
+
+          this.calcUpdate3DGeometry(this._modelGeometry, `⚙️ ${name} (G-Code)`);
+          this.calcUpdate();
+
+          alert(`✅ تم استخراج بيانات السلايسر بنجاح من ${file.name}:\n• وزن الفلمنت: ${parsed.filamentGrams} جم\n• زمن الطباعة: ${hours} ساعة و ${mins} دقيقة\n• دقة الطبقة: ${parsed.layerHeight} مم`);
+        } catch (err) {
+          alert('تعذر قراءة ملف G-Code: ' + (err.message || 'تأكد من وجود تعليقات السلايسر'));
+          console.error(err);
+        }
+      };
+      reader.readAsText(file);
     },
 
     calcProcessSTLFile(file) {
@@ -1070,24 +1158,14 @@
       if (update) this.calcUpdate();
     },
 
-    calcLoadPreset(presetId) {
-      const CalcMod = root.WorkshopCalculator;
-      if (!CalcMod) return;
-
-      const presets = CalcMod.getModelPresets();
-      const preset = presets.find(p => p.id === presetId) || presets[0];
-      this._activePresetId = preset.id;
-
-      document.querySelectorAll('.model-preset-card').forEach(c => {
-        c.classList.toggle('active', c.dataset.preset === preset.id);
-      });
-
+    calcLoadDefaultGeometry() {
+      this._activePresetId = 'default-model';
       this._modelGeometry = {
-        name: preset.name,
-        solidVolumeMm3: preset.volumeMm3,
-        surfaceAreaMm2: preset.surfaceAreaMm2,
-        dimensions: preset.dimensions,
-        triangleCount: preset.id === '3dbenchy' ? 12500 : 25000
+        name: 'نموذج معاينة ثلاثي الأبعاد',
+        solidVolumeMm3: 11350,
+        surfaceAreaMm2: 8400,
+        dimensions: { width: 60, depth: 31, height: 48 },
+        triangleCount: 12500
       };
 
       const dimEl = document.getElementById('m-metric-dim');
@@ -1095,40 +1173,29 @@
       const areaEl = document.getElementById('m-metric-area');
       const triEl = document.getElementById('m-metric-tri');
 
-      if (dimEl) dimEl.textContent = `${preset.dimensions.width} × ${preset.dimensions.depth} × ${preset.dimensions.height} مم`;
-      if (volEl) volEl.textContent = `${(preset.volumeMm3 / 1000).toFixed(2)} cm³`;
-      if (areaEl) areaEl.textContent = `${(preset.surfaceAreaMm2 / 100).toFixed(1)} cm²`;
-      if (triEl) triEl.textContent = this._modelGeometry.triangleCount.toLocaleString('ar-EG');
+      if (dimEl) dimEl.textContent = '60 × 31 × 48 مم';
+      if (volEl) volEl.textContent = '11.35 cm³';
+      if (areaEl) areaEl.textContent = '84.0 cm²';
+      if (triEl) triEl.textContent = (12500).toLocaleString('ar-EG');
 
-      if (preset.defaultInfill !== undefined) {
-        const infillInput = document.getElementById('calc-infill');
-        const infillBadge = document.getElementById('calc-infill-badge');
-        if (infillInput) infillInput.value = preset.defaultInfill;
-        if (infillBadge) infillBadge.textContent = preset.defaultInfill + '%';
-      }
-
-      if (preset.defaultWalls !== undefined) {
-        const wallInput = document.getElementById('calc-walls');
-        if (wallInput) wallInput.value = preset.defaultWalls;
-      }
-
-      const mcToggle = document.getElementById('calc-multicolor-toggle');
-      const mcFields = document.getElementById('multicolor-fields');
-      const mcChip = document.getElementById('chip-multicolor-status');
-      if (preset.multiColor?.enabled) {
-        if (mcToggle) mcToggle.checked = true;
-        if (mcFields) mcFields.style.display = 'block';
-        if (mcChip) mcChip.textContent = `${preset.multiColor.colorSwapsCount} تبديلة`;
-        const swapsEl = document.getElementById('calc-color-swaps');
-        if (swapsEl) swapsEl.value = preset.multiColor.colorSwapsCount;
-      } else {
-        if (mcToggle) mcToggle.checked = false;
-        if (mcFields) mcFields.style.display = 'none';
-        if (mcChip) mcChip.textContent = 'معطل';
-      }
-
-      this.calcUpdate3DGeometry(this._modelGeometry, `${preset.icon} ${preset.name}`);
+      this.calcUpdate3DGeometry(this._modelGeometry, '📦 نموذج معاينة ثلاثي الأبعاد');
       this.calcAutoNesting();
+    },
+
+    calcLoadPreset(presetId) {
+      this.calcLoadDefaultGeometry();
+      this.calcUpdate();
+    },
+
+    calcToggleManualOverride() {
+      const toggle = document.getElementById('calc-manual-override-toggle');
+      const fields = document.getElementById('manual-override-fields');
+      const chip = document.getElementById('chip-manual-override-status');
+      if (!toggle) return;
+
+      const active = toggle.checked;
+      if (fields) fields.style.display = active ? 'block' : 'none';
+      if (chip) chip.textContent = active ? 'مفعل (إدخال يدوي)' : 'معطل';
       this.calcUpdate();
     },
 
@@ -1259,6 +1326,12 @@
       const colorSwaps = Number(document.getElementById('calc-color-swaps')?.value ?? 48);
       const flushVol = Number(document.getElementById('calc-flush-vol')?.value ?? 280);
 
+      const manualOverride = document.getElementById('calc-manual-override-toggle')?.checked === true;
+      const manualWeight = Number(document.getElementById('calc-manual-weight-input')?.value || 0);
+      const manualH = Number(document.getElementById('calc-manual-hours-input')?.value || 0);
+      const manualM = Number(document.getElementById('calc-manual-mins-input')?.value || 0);
+      const totalManualHours = manualH + (manualM / 60);
+
       const inputs = {
         marketId: this._currentMarketId,
         printerProfileId: document.getElementById('calc-printer-profile')?.value || 'neptune_4_pro',
@@ -1271,6 +1344,12 @@
         infillPercent: infill,
         wallCount: walls,
         layerHeightMm: layerH,
+        nozzleDiameter: Number(document.getElementById('calc-nozzle')?.value || 0.4),
+        infillPattern: document.getElementById('calc-infill-pattern')?.value || 'grid',
+        manualWeightOverride: manualOverride && manualWeight > 0,
+        manualWeightGrams: manualWeight,
+        manualTimeOverride: manualOverride && totalManualHours > 0,
+        manualPrintHours: totalManualHours,
         supportType: supType,
         supportCustomPercent: supCustom,
         multiColorEnabled: mcEnabled,
@@ -1393,14 +1472,46 @@
 
       const outMark = document.getElementById('calc-out-markup');
       if (outMark) outMark.textContent = `${res.costs.actualMarkupPercent.toFixed(1)}%`;
+
+      // تحديث شريط التوزيع البصري للتكاليف والأرباح
+      if (res.breakdown) {
+        const segMat = document.getElementById('bar-seg-mat');
+        const segMachine = document.getElementById('bar-seg-machine');
+        const segLabor = document.getElementById('bar-seg-labor');
+        const segRisk = document.getElementById('bar-seg-risk');
+        const segProfit = document.getElementById('bar-seg-profit');
+
+        if (segMat) segMat.style.width = `${res.breakdown.materialPct}%`;
+        if (segMachine) segMachine.style.width = `${res.breakdown.machinePct}%`;
+        if (segLabor) segLabor.style.width = `${res.breakdown.laborPct}%`;
+        if (segRisk) segRisk.style.width = `${res.breakdown.riskPct}%`;
+        if (segProfit) segProfit.style.width = `${res.breakdown.profitPct}%`;
+
+        const valMat = document.getElementById('bar-val-mat');
+        const valMachine = document.getElementById('bar-val-machine');
+        const valLabor = document.getElementById('bar-val-labor');
+        const valProfit = document.getElementById('bar-val-profit');
+        const sumEl = document.getElementById('calc-out-bar-summary');
+
+        if (valMat) valMat.textContent = `${res.breakdown.materialPct}%`;
+        if (valMachine) valMachine.textContent = `${res.breakdown.machinePct}%`;
+        if (valLabor) valLabor.textContent = `${res.breakdown.laborPct}%`;
+        if (valProfit) valProfit.textContent = `${res.breakdown.profitPct}%`;
+        if (sumEl) sumEl.textContent = `خامة: ${res.breakdown.materialPct}% • ربح: ${res.breakdown.profitPct}%`;
+      }
     },
 
     calcReset() {
-      this.calcLoadPreset('3dbenchy');
+      this.calcLoadDefaultGeometry();
       document.getElementById('calc-qty').value = 1;
       document.getElementById('calc-packaging').value = 0;
       document.getElementById('calc-shipping').value = 0;
       document.getElementById('calc-hardware').value = 0;
+      const moToggle = document.getElementById('calc-manual-override-toggle');
+      if (moToggle && moToggle.checked) {
+        moToggle.checked = false;
+        this.calcToggleManualOverride();
+      }
       this.calcUpdate();
     },
 
@@ -1499,7 +1610,614 @@
       if (target) target.innerHTML = content;
       this.openModal('modal-calc-summary');
     }
+,
+    // ==========================================
+    // Pricing Templates Quick Apply
+    // ==========================================
+    calcApplyTemplate(templateId) {
+      const templates = {
+        economy: { margin: 25, layer: '0.28', infill: 15, walls: 2, pattern: 'grid' },
+        standard: { margin: 40, layer: '0.20', infill: 20, walls: 3, pattern: 'grid' },
+        professional: { margin: 55, layer: '0.12', infill: 30, walls: 4, pattern: 'gyroid' },
+        industrial: { margin: 50, layer: '0.20', infill: 50, walls: 5, pattern: 'honeycomb' }
+      };
+
+      const t = templates[templateId];
+      if (!t) return;
+
+      const marginEl = document.getElementById('calc-margin');
+      if (marginEl) marginEl.value = t.margin;
+      const marginBadge = document.getElementById('calc-margin-badge');
+      if (marginBadge) marginBadge.textContent = t.margin + '%';
+
+      const layerEl = document.getElementById('calc-layer-height');
+      if (layerEl) layerEl.value = t.layer;
+
+      const infillEl = document.getElementById('calc-infill');
+      if (infillEl) infillEl.value = t.infill;
+      const infillBadge = document.getElementById('calc-infill-badge');
+      if (infillBadge) infillBadge.textContent = t.infill + '%';
+
+      const wallsEl = document.getElementById('calc-walls');
+      if (wallsEl) wallsEl.value = t.walls;
+
+      const patEl = document.getElementById('calc-infill-pattern');
+      if (patEl) patEl.value = t.pattern;
+
+      this.calcUpdate();
+    },
+
+    // ==========================================
+    // Printable Invoice Modal (A4 / PDF)
+    // ==========================================
+    openPrintableInvoice() {
+      if (!this._lastIntegratedCalcResult) this.calcUpdate();
+      const r = this._lastIntegratedCalcResult;
+      if (!r) return;
+
+      const cur = r.currency.symbol;
+      const invNumber = 'INV-' + Date.now().toString().slice(-6);
+      const invDate = new Date().toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+      const modelName = this._modelGeometry.name || 'قطعة طباعة مخصصة';
+      const qty = r.nesting.quantity || 1;
+      const unitPrice = r.costs.suggestedRetailPrice;
+      const totalPrice = r.batch.batchTotalPrice;
+      const unitCost = r.costs.totalManufacturingCost;
+
+      const html = `
+        <div class="printable-invoice-header">
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:16px; border-bottom:2px solid var(--border); padding-bottom:14px">
+            <div>
+              <div style="font-size:1.4rem; font-weight:900; color:var(--text-primary); letter-spacing:-0.5px">
+                🏭 ورشة <span style="color:var(--accent)">ELMALHY.3D</span> للطباعة الرقمية
+              </div>
+              <div style="font-size:0.85rem; color:var(--text-muted); margin-top:3px">
+                تصنيع رقمي دقيق • نمذجة هندسية • قطع غيار وتجميعات ميكانيكية
+              </div>
+            </div>
+            <div style="text-align:left">
+              <span class="badge" style="background:#e0f2fe; color:#0284c7; font-weight:800; font-size:0.85rem; padding:4px 10px; border-radius:6px">
+                📄 عرض سعر رسمي معتمد
+              </span>
+              <div style="font-size:0.8rem; color:var(--text-muted); margin-top:5px">
+                رقم العرض: <strong>${invNumber}</strong><br>
+                التاريخ: <strong>${invDate}</strong>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; font-size:0.85rem">
+            <div style="background:var(--bg-tertiary); padding:12px; border-radius:8px">
+              <div style="font-weight:700; color:var(--accent); margin-bottom:4px">بيانات العميل / الجهة الطالبة:</div>
+              <div>• الاسم: عميل نقدي / طلب ورشة</div>
+              <div>• المشروع: تصنيع نماذج ثلاثية الأبعاد</div>
+              <div>• العملة المعتمدة: ${cur} (الجنيه المصري)</div>
+            </div>
+            <div style="background:var(--bg-tertiary); padding:12px; border-radius:8px">
+              <div style="font-weight:700; color:var(--accent-2); margin-bottom:4px">بيانات الورشة والتنفيذ:</div>
+              <div>• ماكينة الإنتاج: Elegoo Neptune 4 Pro (Klipper Core)</div>
+              <div>• معايير الجودة: تفاوت هندسي ±0.15 مم • ملء صلب للمقابس</div>
+              <div>• مدة سريان العرض: 7 أيام عمل من تاريخه</div>
+            </div>
+          </div>
+
+          <table style="width:100%; border-collapse:collapse; margin-bottom:20px; font-size:0.85rem">
+            <thead>
+              <tr style="background:var(--bg-tertiary); border-bottom:2px solid var(--border)">
+                <th style="padding:10px; text-align:right">البند والمواصفات الفنية</th>
+                <th style="padding:10px; text-align:center">الخامة والدقة</th>
+                <th style="padding:10px; text-align:center">الكمية</th>
+                <th style="padding:10px; text-align:left">سعر القطعة</th>
+                <th style="padding:10px; text-align:left">الإجمالي</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="border-bottom:1px solid var(--border)">
+                <td style="padding:12px 10px">
+                  <strong>${modelName}</strong>
+                  <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px">
+                    الأبعاد: ${this._modelGeometry.dimensions.width}×${this._modelGeometry.dimensions.depth}×${this._modelGeometry.dimensions.height} مم • الوزن: ${r.mass.singlePieceTotalGrams}g • زمن الطباعة: ${r.time.formattedDuration}
+                  </div>
+                </td>
+                <td style="padding:12px 10px; text-align:center">
+                  ${r.material.name}<br>
+                  <span style="font-size:0.75rem; color:var(--text-muted)">طبقة ${r.geometry.layerHeightMm} مم • حشو ${r.geometry.infillPercent}%</span>
+                </td>
+                <td style="padding:12px 10px; text-align:center; font-weight:700">${qty}</td>
+                <td style="padding:12px 10px; text-align:left">${unitPrice} ${cur}</td>
+                <td style="padding:12px 10px; text-align:left; font-weight:800; color:var(--accent)">${totalPrice} ${cur}</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:20px">
+            <div style="max-width:55%; font-size:0.78rem; color:var(--text-muted); line-height:1.6">
+              <div style="font-weight:700; color:var(--text-primary); margin-bottom:4px">شروط التصنيع والضمان:</div>
+              1. يتم احتساب الأبعاد النهائية طبقاً لملف الـ 3D المعتمد من قبل العميل.<br>
+              2. الدفعة المقدمة 50% لتأمين الخامات وبدء أمر الإنتاج المباشر.<br>
+              3. يتم تسليم القطع مفحوصة ومزال منها الدعامات وجاهزة للتركيب فوراً.
+            </div>
+            <div style="min-width:240px; background:var(--bg-tertiary); padding:14px; border-radius:8px; font-size:0.85rem">
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px">
+                <span>إجمالي الخامات والتصنيع:</span>
+                <span>${(unitCost * qty).toFixed(2)} ${cur}</span>
+              </div>
+              <div style="display:flex; justify-content:space-between; margin-bottom:6px">
+                <span>مصاريف الشحن / التوصيل:</span>
+                <span>${r.batch.shippingFee || '0.00'} ${cur}</span>
+              </div>
+              <div style="border-top:2px solid var(--border); padding-top:8px; margin-top:8px; display:flex; justify-content:space-between; font-weight:900; font-size:1.1rem; color:var(--green)">
+                <span>المبلغ الإجمالي المستحق:</span>
+                <span>${totalPrice} ${cur}</span>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:flex; justify-content:space-between; align-items:flex-end; border-top:1px dashed var(--border); padding-top:16px; margin-top:20px; font-size:0.8rem">
+            <div>
+              <div>توقيع واستلام العميل: __________________</div>
+            </div>
+            <div style="text-align:left">
+              <div style="font-weight:700; color:var(--text-primary)">اعتماد إدارة ورشة ELMALHY.3D</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">المهندس كريم المالحي — مهندس التصنيع</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      const target = document.getElementById('printable-invoice-content');
+      if (target) target.innerHTML = html;
+      this.openModal('modal-printable-invoice');
+    },
+
+    // ==========================================
+    // Multi-Part Assembly Controller (تجميعات القطع)
+    // ==========================================
+    _assemblyParts: [],
+
+    assemblyAddPart() {
+      const nameInput = document.getElementById('assembly-part-name');
+      const matSelect = document.getElementById('assembly-part-material');
+      const weightInput = document.getElementById('assembly-part-weight');
+      const hoursInput = document.getElementById('assembly-part-hours');
+      const qtyInput = document.getElementById('assembly-part-qty');
+
+      const name = nameInput?.value.trim();
+      const material = matSelect?.value || 'patron_pla_plus';
+      const weight = parseFloat(weightInput?.value);
+      const hours = parseFloat(hoursInput?.value);
+      const qty = parseInt(qtyInput?.value, 10) || 1;
+
+      if (!name) {
+        alert('من فضلك اكتب اسم الجزء أو المكون.');
+        nameInput?.focus();
+        return;
+      }
+      if (isNaN(weight) || weight <= 0) {
+        alert('من فضلك أدخل وزن الجزء بالجرام بشكل صحيح.');
+        weightInput?.focus();
+        return;
+      }
+      if (isNaN(hours) || hours <= 0) {
+        alert('من فضلك أدخل ساعات طباعة الجزء بشكل صحيح.');
+        hoursInput?.focus();
+        return;
+      }
+
+      const matNames = {
+        patron_pla_plus: 'Patron PLA+',
+        patron_pla: 'Patron PLA',
+        patron_petg: 'Patron PETG',
+        patron_abs: 'Patron ABS',
+        esun_pla_plus: 'eSUN PLA+',
+        tpu: 'TPU 95A'
+      };
+
+      const part = {
+        id: 'asm-' + Date.now() + '-' + Math.random().toString(36).substr(2, 4),
+        name: name,
+        material: material,
+        materialName: matNames[material] || material,
+        weight: weight,
+        hours: hours,
+        qty: qty
+      };
+
+      this._assemblyParts.push(part);
+
+      if (nameInput) nameInput.value = '';
+      if (weightInput) weightInput.value = '';
+      if (hoursInput) hoursInput.value = '';
+      if (qtyInput) qtyInput.value = '1';
+
+      this.renderAssembly();
+    },
+
+    assemblyRemovePart(id) {
+      this._assemblyParts = this._assemblyParts.filter(p => p.id !== id);
+      this.renderAssembly();
+    },
+
+    assemblyClear() {
+      if (this._assemblyParts.length === 0) return;
+      if (confirm('هل أنت متأكد من تفريغ جميع أجزاء التجميعة الحالية؟')) {
+        this._assemblyParts = [];
+        this.renderAssembly();
+      }
+    },
+
+    renderAssembly() {
+      const tbody = document.getElementById('assembly-table-body');
+      const countEl = document.getElementById('assembly-parts-count');
+      if (!tbody) return;
+
+      if (countEl) countEl.textContent = this._assemblyParts.length;
+
+      if (this._assemblyParts.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted)">
+              لم تتم إضافة أجزاء للتجميعة بعد. استخدم النموذج أعلاه لإضافة مكونات المجسم.
+            </td>
+          </tr>
+        `;
+        document.getElementById('assembly-total-price').textContent = '0.00';
+        document.getElementById('assembly-total-pieces').textContent = '0 قطعة';
+        document.getElementById('assembly-total-weight').textContent = '0.0 g';
+        document.getElementById('assembly-total-hours').textContent = '0.0 ساعة';
+        document.getElementById('assembly-cost-material').textContent = '0.00 ج.م';
+        document.getElementById('assembly-cost-machine').textContent = '0.00 ج.م';
+        document.getElementById('assembly-total-cost').textContent = '0.00 ج.م';
+        document.getElementById('assembly-total-profit').textContent = '0.00 ج.م';
+        return;
+      }
+
+      const CalcMod = root.WorkshopCalculator;
+      const mats = CalcMod ? CalcMod.MATERIALS : {};
+      const primaryPrinter = Printer ? Printer.getPrimaryPrinter() : null;
+      const hourlyOperatingCost = primaryPrinter ? Printer.calculateHourlyCost(primaryPrinter).totalHourlyOperatingCost : 18.5;
+
+      let totalPieces = 0;
+      let totalWeight = 0;
+      let totalHours = 0;
+      let totalMatCost = 0;
+      let totalMachineCost = 0;
+
+      const rows = this._assemblyParts.map((p, idx) => {
+        const pTotalWeight = p.weight * p.qty;
+        const pTotalHours = p.hours * p.qty;
+        const pricePerKg = mats[p.material]?.pricePerKg || 650;
+        const matCost = pTotalWeight * (pricePerKg / 1000) * 1.05;
+        const machCost = pTotalHours * hourlyOperatingCost;
+
+        totalPieces += p.qty;
+        totalWeight += pTotalWeight;
+        totalHours += pTotalHours;
+        totalMatCost += matCost;
+        totalMachineCost += machCost;
+
+        return `
+          <tr>
+            <td><strong>${idx + 1}. ${p.name}</strong></td>
+            <td><span class="badge" style="background:#e0f2fe; color:#0284c7; font-size:0.75rem">${p.materialName}</span></td>
+            <td>${p.weight.toFixed(1)} g</td>
+            <td>${p.hours.toFixed(1)} h</td>
+            <td><strong>${p.qty}</strong></td>
+            <td><strong>${pTotalWeight.toFixed(1)} g</strong></td>
+            <td>${pTotalHours.toFixed(1)} h</td>
+            <td>
+              <button class="btn btn-sm btn-danger" onclick="App.assemblyRemovePart('${p.id}')">حذف</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.innerHTML = rows;
+
+      const totalCost = totalMatCost + totalMachineCost;
+      const margin = 0.40;
+      const suggestedPrice = Math.round(totalCost / (1 - margin));
+      const profit = suggestedPrice - totalCost;
+
+      document.getElementById('assembly-total-price').textContent = suggestedPrice.toFixed(2);
+      document.getElementById('assembly-total-pieces').textContent = `${totalPieces} قطعة (${this._assemblyParts.length} مكونات)`;
+      document.getElementById('assembly-total-weight').textContent = `${totalWeight.toFixed(1)} g`;
+      document.getElementById('assembly-total-hours').textContent = `${totalHours.toFixed(1)} ساعة`;
+      document.getElementById('assembly-cost-material').textContent = `${totalMatCost.toFixed(2)} ج.م`;
+      document.getElementById('assembly-cost-machine').textContent = `${totalMachineCost.toFixed(2)} ج.م`;
+      document.getElementById('assembly-total-cost').textContent = `${totalCost.toFixed(2)} ج.م`;
+      document.getElementById('assembly-total-profit').textContent = `${profit.toFixed(2)} ج.م`;
+    },
+
+    assemblySaveAsQuote() {
+      if (this._assemblyParts.length === 0) {
+        alert('يرجى إضافة أجزاء للتجميعة أولاً قبل حفظها كعرض سعر.');
+        return;
+      }
+
+      let totalWeight = 0;
+      let totalHours = 0;
+      const summaryNames = this._assemblyParts.map(p => `${p.name} (${p.qty}x)`).join(' + ');
+      this._assemblyParts.forEach(p => {
+        totalWeight += p.weight * p.qty;
+        totalHours += p.hours * p.qty;
+      });
+
+      this.openNewOrderModal(true);
+      document.getElementById('order-item-name').value = `تجميعة مركبة: ${summaryNames}`;
+      document.getElementById('order-item-weight').value = Math.round(totalWeight);
+      document.getElementById('order-item-hours').value = parseFloat(totalHours.toFixed(1));
+      document.getElementById('order-item-qty').value = '1';
+      document.getElementById('order-margin-pct').value = '40';
+      document.getElementById('order-notes').value = `مكونات التجميعة:\n` + this._assemblyParts.map(p => `• ${p.name}: ${p.qty} قطع × ${p.weight}g (${p.hours}h) - ${p.materialName}`).join('\n');
+      this.recalcOrderModal();
+    },
+
+    assemblySaveAsProduct() {
+      if (this._assemblyParts.length === 0) {
+        alert('يرجى إضافة أجزاء للتجميعة أولاً قبل حفظها كمنتج في الكتالوج.');
+        return;
+      }
+
+      let totalWeight = 0;
+      let totalHours = 0;
+      this._assemblyParts.forEach(p => {
+        totalWeight += p.weight * p.qty;
+        totalHours += p.hours * p.qty;
+      });
+
+      const price = parseFloat(document.getElementById('assembly-total-price').textContent) || 0;
+      const totalCost = parseFloat(document.getElementById('assembly-total-cost').textContent) || 0;
+
+      this.openModal('modal-product');
+      document.getElementById('modal-product-title').textContent = 'إضافة تجميعة جديدة كمنتج جاهز';
+      document.getElementById('prod-form').reset();
+      document.getElementById('prod-sku').value = 'ASM-' + Date.now().toString().slice(-5);
+      document.getElementById('prod-name').value = 'تجميعة مركبة (' + this._assemblyParts.length + ' أجزاء)';
+      document.getElementById('prod-category').value = 'assemblies';
+      document.getElementById('prod-weight').value = Math.round(totalWeight);
+      document.getElementById('prod-hours').value = parseFloat(totalHours.toFixed(1));
+      document.getElementById('prod-price').value = price;
+      document.getElementById('prod-cost').value = Math.round(totalCost);
+      document.getElementById('prod-desc').value = 'مكونات التجميعة:\n' + this._assemblyParts.map(p => `• ${p.name}: ${p.qty} قطع × ${p.weight}g`).join('\n');
+    },
+
+    // ==========================================
+    // ROI & Payback Controller (العائد على الاستثمار)
+    // ==========================================
+    renderROI() {
+      this.roiCalculate();
+    },
+
+    roiCalculate() {
+      const printerCost = parseFloat(document.getElementById('roi-printer-cost')?.value) || 26000;
+      const printerLife = parseFloat(document.getElementById('roi-printer-life')?.value) || 5000;
+      const avgProfit = parseFloat(document.getElementById('roi-avg-profit')?.value) || 85;
+      const avgHours = parseFloat(document.getElementById('roi-avg-hours')?.value) || 2.5;
+      const monthlyVolume = parseFloat(document.getElementById('roi-monthly-volume')?.value) || 35;
+      const dailyHours = parseFloat(document.getElementById('roi-daily-hours')?.value) || 10;
+
+      const paybackUnits = avgProfit > 0 ? Math.ceil(printerCost / avgProfit) : 0;
+      const paybackHours = Math.round(paybackUnits * avgHours);
+      const monthlyProfit = Math.round(monthlyVolume * avgProfit);
+      const monthsToBreakEven = monthlyProfit > 0 ? (printerCost / monthlyProfit).toFixed(1) : '∞';
+
+      let actualProfit = 0;
+      try {
+        const orders = DB.getOrders ? DB.getOrders() : [];
+        orders.forEach(o => {
+          if (o.stage === 'delivered' || o.stage === 'completed') {
+            actualProfit += (o.financials?.profit || 0);
+          }
+        });
+      } catch (e) {}
+
+      const progressPct = printerCost > 0 ? Math.min(100, Math.round((actualProfit / printerCost) * 100)) : 0;
+
+      const unitsEl = document.getElementById('roi-out-units');
+      const hoursEl = document.getElementById('roi-out-hours');
+      const profitEl = document.getElementById('roi-out-monthly-profit');
+      const monthsEl = document.getElementById('roi-out-months');
+      const actualEl = document.getElementById('roi-actual-profit');
+      const targetEl = document.getElementById('roi-target-cost');
+      const fillEl = document.getElementById('roi-progress-fill');
+      const pctEl = document.getElementById('roi-progress-percent');
+      const statusEl = document.getElementById('roi-recovery-status');
+
+      if (unitsEl) unitsEl.textContent = `${paybackUnits.toLocaleString('ar-EG')} قطعة`;
+      if (hoursEl) hoursEl.textContent = `${paybackHours.toLocaleString('ar-EG')} ساعة`;
+      if (profitEl) profitEl.textContent = `${monthlyProfit.toLocaleString('ar-EG')} ج.م`;
+      if (monthsEl) monthsEl.textContent = `${monthsToBreakEven} شهر`;
+      if (actualEl) actualEl.textContent = `${actualProfit.toLocaleString('ar-EG')} ج.م`;
+      if (targetEl) targetEl.textContent = `${printerCost.toLocaleString('ar-EG')} ج.م`;
+      if (fillEl) fillEl.style.width = `${progressPct}%`;
+      if (pctEl) pctEl.textContent = `${progressPct}%`;
+
+      if (statusEl) {
+        if (progressPct >= 100) {
+          statusEl.textContent = '🎉 مبروك! تم استرداد تكلفة الطابعة بالكامل وتوليد أرباح صافية 100%.';
+          statusEl.style.color = 'var(--green)';
+        } else {
+          const remaining = Math.max(0, printerCost - actualProfit);
+          statusEl.textContent = `متبقي ${remaining.toLocaleString('ar-EG')} ج.م أرباح صافية للوصول لنقطة التعادل التام.`;
+          statusEl.style.color = 'var(--text-muted)';
+        }
+      }
+    },
+
+    // ==========================================
+    // Customer Orders Controller (طلبات العملاء الخارجية)
+    // ==========================================
+    _customerOrders: [],
+
+    initCustomerOrdersConfig() {
+      const savedUrl = localStorage.getItem('cust_orders_url');
+      const savedKey = localStorage.getItem('cust_orders_key');
+      if (savedUrl) { const el = document.getElementById('cust-orders-url'); if (el) el.value = savedUrl; }
+      if (savedKey) { const el = document.getElementById('cust-orders-key'); if (el) el.value = savedKey; }
+      this.customerOrdersFetch(false);
+    },
+
+    customerOrdersSaveConfig() {
+      const url = document.getElementById('cust-orders-url')?.value.trim() || '';
+      const key = document.getElementById('cust-orders-key')?.value.trim() || '';
+      localStorage.setItem('cust_orders_url', url);
+      localStorage.setItem('cust_orders_key', key);
+    },
+
+    customerOrdersUpdateBadge() {
+      try {
+        const local = JSON.parse(localStorage.getItem('elmalhy_customer_web_orders') || '[]');
+        const pendingCount = local.filter(o => o.Status === 'pending_review' || o.status === 'جديد (New)').length;
+        const badge = document.getElementById('sidebar-web-orders-badge');
+        if (badge) {
+          badge.textContent = pendingCount > 0 ? pendingCount : '0';
+          badge.style.display = pendingCount > 0 ? 'inline-block' : 'none';
+        }
+      } catch (e) {}
+    },
+
+    async customerOrdersFetch(showAlert = true) {
+      const url = localStorage.getItem('cust_orders_url') || document.getElementById('cust-orders-url')?.value.trim() || '';
+      const key = localStorage.getItem('cust_orders_key') || document.getElementById('cust-orders-key')?.value.trim() || '';
+
+      let fetchedOrders = [];
+
+      if (url && !url.includes('PASTE_YOUR')) {
+        try {
+          const res = await fetch(`${url}?action=list&key=${encodeURIComponent(key)}`);
+          const data = await res.json();
+          if (data.success && Array.isArray(data.orders)) {
+            fetchedOrders = data.orders;
+            localStorage.setItem('elmalhy_customer_web_orders', JSON.stringify(fetchedOrders));
+            if (showAlert) alert(`✅ تم جلب ${fetchedOrders.length} طلب بنجاح من Google Sheets.`);
+          } else if (showAlert) {
+            alert('تعذر جلب الطلبات: ' + (data.error || 'تأكد من صحة الرابط وكلمة السر'));
+          }
+        } catch (err) {
+          console.warn('Google Sheets fetch failed, falling back to local orders:', err);
+          if (showAlert) alert('تعذر الاتصال بالسيرفر السحابي، سيتم عرض الطلبات المخزنة محلياً.');
+        }
+      }
+
+      try {
+        let local = JSON.parse(localStorage.getItem('elmalhy_customer_web_orders') || '[]');
+        if (local.length === 0) {
+          local = [{
+            TrackingCode: 'ORD-894210',
+            Timestamp: new Date().toISOString(),
+            PartName: 'ترس ميكانيكي (Gearbox Bracket)',
+            ClientName: 'م. أحمد محمود',
+            Phone: '01012345678',
+            Notes: 'الخامة المطلوبة PETG أسود بملء 40%',
+            FileType: 'STL',
+            FileName: 'gearbox_bracket.stl',
+            Weight: 54,
+            Hours: 3.2,
+            AutoPrice: 165,
+            FinalPrice: 165,
+            Status: 'pending_review'
+          }];
+          localStorage.setItem('elmalhy_customer_web_orders', JSON.stringify(local));
+        }
+        this._customerOrders = local;
+      } catch (e) {
+        this._customerOrders = [];
+      }
+
+      this.renderCustomerOrders();
+      this.customerOrdersUpdateBadge();
+    },
+
+    renderCustomerOrders() {
+      const tbody = document.getElementById('cust-orders-tbody');
+      const countEl = document.getElementById('cust-orders-count');
+      if (!tbody) return;
+
+      const orders = this._customerOrders || [];
+      if (countEl) countEl.textContent = orders.length;
+
+      if (orders.length === 0) {
+        tbody.innerHTML = `
+          <tr>
+            <td colspan="10" style="text-align:center; padding:30px; color:var(--text-muted)">
+              لا توجد طلبات عملاء حتى الآن. يمكنك إرسال طلب تجريبي عبر صفحة العميل order.html.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      const statusLabels = {
+        pending_review: '<span class="badge" style="background:#fef3c7; color:#d97706">⏳ قيد المراجعة</span>',
+        priced: '<span class="badge" style="background:#e0f2fe; color:#0284c7">💰 تم التسعير</span>',
+        printing: '<span class="badge" style="background:#e0e7ff; color:#4f46e5">🖨️ جاري الطباعة</span>',
+        ready: '<span class="badge" style="background:#dcfce7; color:#16a34a">📦 جاهز</span>',
+        delivered: '<span class="badge" style="background:#dcfce7; color:#16a34a">✅ تم التسليم</span>',
+        converted: '<span class="badge" style="background:#f1f5f9; color:#64748b">🏭 تم تحويله للورشة</span>'
+      };
+
+      const rows = orders.map(o => {
+        const code = o.TrackingCode || o.code || '—';
+        const dateStr = o.Timestamp || o.date ? new Date(o.Timestamp || o.date).toLocaleDateString('ar-EG') : '—';
+        const client = o.ClientName || o.customerName || '—';
+        const phone = o.Phone || o.customerPhone || '—';
+        const part = o.PartName || o.fileName || 'مجسم ثلاثي الأبعاد';
+        const file = o.FileName || o.fileName || 'ملف مرفق';
+        const weight = o.Weight || o.weight ? `${o.Weight || o.weight} g` : '—';
+        const price = (o.FinalPrice || o.AutoPrice || o.price || 0) + ' ج.م';
+        const rawStatus = o.Status || o.status || 'pending_review';
+        const statusHtml = statusLabels[rawStatus] || `<span class="badge">${rawStatus}</span>`;
+
+        return `
+          <tr>
+            <td><strong style="color:var(--accent); font-family:monospace">${code}</strong></td>
+            <td>${dateStr}</td>
+            <td><strong>${client}</strong></td>
+            <td><a href="tel:${phone}" style="color:var(--accent)">${phone}</a></td>
+            <td>${part}</td>
+            <td><span style="font-size:0.75rem; color:var(--text-muted)">📎 ${file}</span></td>
+            <td>${weight}</td>
+            <td><strong style="color:var(--green)">${price}</strong></td>
+            <td>${statusHtml}</td>
+            <td>
+              <button class="btn btn-sm btn-primary" onclick="App.customerOrderConvertToOrder('${code}')">🏭 اعتماد كطلب ورشة</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+
+      tbody.innerHTML = rows;
+    },
+
+    customerOrderConvertToOrder(code) {
+      const order = (this._customerOrders || []).find(o => (o.TrackingCode || o.code) === code);
+      if (!order) return;
+
+      this.openNewOrderModal(false);
+
+      const client = order.ClientName || order.customerName || '';
+      const phone = order.Phone || order.customerPhone || '';
+      const part = order.PartName || order.fileName || 'مجسم ثلاثي الأبعاد';
+      const weight = order.Weight || order.weight || 50;
+      const hours = order.Hours || order.hours || 2.5;
+      const notes = order.Notes || order.notes || '';
+
+      document.getElementById('order-item-name').value = `طلب عميل: ${part}`;
+      document.getElementById('order-item-weight').value = weight;
+      document.getElementById('order-item-hours').value = hours;
+      document.getElementById('order-item-qty').value = '1';
+      document.getElementById('order-notes').value = `كود المتابعة: ${code} • العميل: ${client} (${phone})\n${notes}`;
+
+      this.recalcOrderModal();
+
+      order.Status = 'converted';
+      localStorage.setItem('elmalhy_customer_web_orders', JSON.stringify(this._customerOrders));
+      this.customerOrdersUpdateBadge();
+    }
+
   };
+
 
   root.App = App;
   document.addEventListener('DOMContentLoaded', () => App.init());

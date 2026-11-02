@@ -28,6 +28,12 @@
       filamentPricePerKg: {
         pla: 900,
         pla_plus: 950,
+        patron_pla: 600,
+        patron_pla_plus: 700,
+        patron_petg: 650,
+        patron_abs: 750,
+        patron_tpu: 950,
+        esun_pla_plus: 950,
         petg: 950,
         abs: 920,
         tpu: 1450,
@@ -309,6 +315,78 @@
       maxVolumetricFlowMm3PerS: 14,
       shrinkagePercent: 1.3,
       description: 'أقوى خامات الـ FDM على الإطلاق مع مقاومة حرارية حتى 120°C وصلابة هيكلية خارقة.'
+    },
+    {
+      id: 'patron_pla',
+      name: '🇪🇬 Patron 3D PLA (محلي)',
+      fullName: 'Patron 3D Local Egyptian PLA',
+      brand: 'Patron 3D',
+      density: 1.24,
+      typicalBedTempC: 60,
+      typicalNozzleTempC: 210,
+      maxVolumetricFlowMm3PerS: 16,
+      shrinkagePercent: 0.3,
+      description: 'فيلامنت مصري محلي عالي الجودة للديكور والنماذج الأولية بسعر اقتصادي ممتاز.'
+    },
+    {
+      id: 'patron_pla_plus',
+      name: '🇪🇬 Patron 3D PLA+ (محلي)',
+      fullName: 'Patron 3D Local Egyptian Tough PLA+',
+      brand: 'Patron 3D',
+      density: 1.24,
+      typicalBedTempC: 60,
+      typicalNozzleTempC: 215,
+      maxVolumetricFlowMm3PerS: 18,
+      shrinkagePercent: 0.3,
+      description: 'فيلامنت مصري مقوى بمقاومة صدمات ممتازة ومثالي للمنتجات الاستهلاكية والتجارية.'
+    },
+    {
+      id: 'patron_petg',
+      name: '🇪🇬 Patron 3D PETG (محلي)',
+      fullName: 'Patron 3D Local Egyptian PETG',
+      brand: 'Patron 3D',
+      density: 1.27,
+      typicalBedTempC: 75,
+      typicalNozzleTempC: 240,
+      maxVolumetricFlowMm3PerS: 14,
+      shrinkagePercent: 0.5,
+      description: 'مقاوم للحرارة والرطوبة للاستخدام العملي والخارجي بإنتاج مصري.'
+    },
+    {
+      id: 'patron_abs',
+      name: '🇪🇬 Patron 3D ABS (محلي)',
+      fullName: 'Patron 3D Local Egyptian ABS',
+      brand: 'Patron 3D',
+      density: 1.04,
+      typicalBedTempC: 100,
+      typicalNozzleTempC: 255,
+      maxVolumetricFlowMm3PerS: 16,
+      shrinkagePercent: 1.4,
+      description: 'ميكانيكي صلب مقاوم للحرارة حتى 90 درجة مئوية.'
+    },
+    {
+      id: 'patron_tpu',
+      name: '🇪🇬 Patron 3D TPU 95A (محلي)',
+      fullName: 'Patron 3D Local Egyptian Flexible TPU',
+      brand: 'Patron 3D',
+      density: 1.21,
+      typicalBedTempC: 50,
+      typicalNozzleTempC: 230,
+      maxVolumetricFlowMm3PerS: 5,
+      shrinkagePercent: 0.6,
+      description: 'مطاطي مرن للصدمات والمقابض والأغطية الواقية.'
+    },
+    {
+      id: 'esun_pla_plus',
+      name: 'eSUN PLA+ (مستورد)',
+      fullName: 'eSUN Imported Tough PLA+',
+      brand: 'eSUN',
+      density: 1.24,
+      typicalBedTempC: 60,
+      typicalNozzleTempC: 215,
+      maxVolumetricFlowMm3PerS: 18,
+      shrinkagePercent: 0.3,
+      description: 'الخامة الأكثر شهرة واعتمادية عالمياً لطباعة فائقة النعومة.'
     }
   ];
 
@@ -440,7 +518,12 @@
     // 2. تشريح الحجم إلى جدران وحشو داخلي
     const sliced = Calc.sliceVolume(solidVolumeMm3, infillPercent, wallCount, surfaceAreaMm2);
     const netModelVolumeMm3 = sliced.slicedNetVolumeMm3;
-    const netModelMassGrams = Math.round((netModelVolumeMm3 / 1000) * material.density * 10) / 10;
+    let netModelMassGrams = Math.round((netModelVolumeMm3 / 1000) * material.density * 10) / 10;
+
+    // دعم التجاوز اليدوي المباشر للوزن (Manual Weight Override)
+    if (inputs.manualWeightOverride && Number(inputs.manualWeightGrams) > 0) {
+      netModelMassGrams = Math.round(Number(inputs.manualWeightGrams) * 10) / 10;
+    }
 
     // 3. خامة الدعم (Supports)
     const supportRes = Calc.calculateSupportWaste(
@@ -499,7 +582,7 @@
       printHoursPerPiece = Number(inputs.manualPrintHours) || 1;
       timeResult = {
         totalTimeHours: printHoursPerPiece,
-        formattedDuration: `${printHoursPerPiece.toFixed(1)} ساعة`,
+        formattedDuration: `${printHoursPerPiece.toFixed(1)} ساعة (يدوي)`,
         isManualOverride: true
       };
     } else {
@@ -515,7 +598,21 @@
         toolChangeOverheadSeconds: 70,
         preheatWarmupMinutes: 5
       });
-      printHoursPerPiece = timeResult.totalTimeHours;
+
+      // عوامل قطر الفوهة ونمط الحشو (Nozzle & Infill Factors)
+      const nozzleDiameter = Number(inputs.nozzleDiameter) || 0.4;
+      let nozzleFactor = 1.0;
+      if (nozzleDiameter <= 0.25) nozzleFactor = 2.1;
+      else if (nozzleDiameter >= 0.75) nozzleFactor = 0.52;
+      else if (nozzleDiameter >= 0.55) nozzleFactor = 0.72;
+
+      const infillPattern = inputs.infillPattern || 'grid';
+      let patternFactor = 1.0;
+      if (infillPattern === 'gyroid') patternFactor = 1.08;
+      else if (infillPattern === 'honeycomb') patternFactor = 1.15;
+      else if (infillPattern === 'lines') patternFactor = 0.90;
+
+      printHoursPerPiece = Math.round(timeResult.totalTimeHours * nozzleFactor * patternFactor * 100) / 100;
     }
 
     // إجمالي زمن الباتش (مع الأخذ في الاعتبار تسخين كل لوح)
@@ -593,11 +690,26 @@
     const batchTotalPrice = suggestedRetailPrice * quantity + shippingFee;
     const batchGrossProfit = unitGrossProfit * quantity;
 
+    // حساب النسب المئوية لتوزيع التكاليف والأرباح
+    const totalRev = suggestedRetailPrice > 0 ? suggestedRetailPrice : 1;
+    const materialPct = Math.max(0, Math.round((totalMaterialCost / totalRev) * 100));
+    const machinePct = Math.max(0, Math.round(((powerCost + depreciationCost + maintenanceCost) / totalRev) * 100));
+    const laborPct = Math.max(0, Math.round(((laborCostPerPiece + hardwareCost + postProcessCost + packagingCost) / totalRev) * 100));
+    const riskPct = Math.max(0, Math.round((failureRiskBuffer / totalRev) * 100));
+    const profitPct = Math.max(0, Math.round((unitGrossProfit / totalRev) * 100));
+
     return {
       market,
       printer,
       material,
       currency: market.currency,
+      breakdown: {
+        materialPct,
+        machinePct,
+        laborPct,
+        riskPct,
+        profitPct
+      },
       geometry: {
         solidVolumeMm3: Calc.round(solidVolumeMm3, 1),
         netModelVolumeMm3: Calc.round(netModelVolumeMm3, 1),
@@ -670,6 +782,7 @@
     convertFilamentLength,
     formatCurrency,
     calculateIntegrated,
-    parseSTL: Calc.parseSTL
+    parseSTL: Calc.parseSTL,
+    parseGCode: Calc.parseGCode
   };
 });

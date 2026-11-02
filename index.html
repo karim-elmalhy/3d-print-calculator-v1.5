@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>ELMALHY.3D — Workshop Manager</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0284c7">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="css/workshop.css">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220%22><text y=%2226%22 font-size=%2226%22>🖨️</text></svg>">
 </head>
@@ -15,7 +18,7 @@
       <div class="brand-logo">🏭</div>
       <div class="brand-text">
         <div class="brand-title">ELMALHY.3D</div>
-        <div class="brand-subtitle">Workshop Manager v2.0</div>
+        <div class="brand-subtitle">Workshop Manager v3.0</div>
       </div>
     </div>
 
@@ -26,8 +29,21 @@
       <li class="nav-item" data-tab="calculator">
         <button><span class="nav-icon">🧮</span><span>حاسبة التسعير المتكاملة</span></button>
       </li>
+      <li class="nav-item" data-tab="assembly">
+        <button><span class="nav-icon">🧩</span><span>تجميعات القطع (Assembly)</span></button>
+      </li>
+      <li class="nav-item" data-tab="roi">
+        <button><span class="nav-icon">💡</span><span>استرداد الاستثمار (ROI)</span></button>
+      </li>
       <li class="nav-item" data-tab="orders">
         <button><span class="nav-icon">📦</span><span>مسار الطلبات والإنتاج</span></button>
+      </li>
+      <li class="nav-item" data-tab="customer-orders">
+        <button>
+          <span class="nav-icon">📥</span>
+          <span>طلبات العملاء (Web)</span>
+          <span class="nav-badge" id="sidebar-web-orders-badge" style="display: none;">0</span>
+        </button>
       </li>
       <li class="nav-item" data-tab="quotations">
         <button><span class="nav-icon">📑</span><span>عروض الأسعار</span></button>
@@ -47,6 +63,9 @@
       </li>
       <li class="nav-item" data-tab="printer">
         <button><span class="nav-icon">⚙️</span><span>طابعة Neptune 4 Pro</span></button>
+      </li>
+      <li class="nav-item" data-tab="troubleshoot">
+        <button><span class="nav-icon">🛠️</span><span>دليل الأعطال والمعايرة</span></button>
       </li>
       <li class="nav-item" data-tab="backup">
         <button><span class="nav-icon">💾</span><span>النسخ الاحتياطي</span></button>
@@ -555,6 +574,7 @@
           <p>محرك حساب شامل: تشريح الحجم، خامات الدعم، هدر الألوان، رص القطع على السطح، وتحليل ملفات STL ثلاثية الأبعاد</p>
         </div>
         <div class="top-actions">
+          <button class="btn btn-secondary" onclick="App.openPrintableInvoice()">🖨️ الفاتورة وعرض السعر الرسمي</button>
           <button class="btn btn-success" onclick="App.calcSaveAsQuote()">💾 حفظ كعرض سعر رسمي</button>
           <button class="btn btn-primary" onclick="App.calcOpenSummaryModal()">📋 ملخص الحسبة والطباعة</button>
           <button class="btn btn-secondary" onclick="App.calcReset()">↺ إعادة تعيين</button>
@@ -584,49 +604,44 @@
         </button>
       </div>
 
+      <!-- شريط قوالب التسعير السريعة (Pricing Templates Quick Apply) -->
+      <div class="pricing-templates-bar">
+        <span style="font-size:0.8rem; font-weight:700; color:var(--text-muted); margin-left:6px">⚡ قوالب تسعير سريعة:</span>
+        <button type="button" class="template-btn" onclick="App.calcApplyTemplate('economy')">اقتصادي (25% هامش • 0.28 مم)</button>
+        <button type="button" class="template-btn" onclick="App.calcApplyTemplate('standard')">قياسي (40% هامش • 0.20 مم)</button>
+        <button type="button" class="template-btn" onclick="App.calcApplyTemplate('professional')">احترافي (55% هامش • 0.12 مم)</button>
+        <button type="button" class="template-btn" onclick="App.calcApplyTemplate('industrial')">صناعي (50% هامش • 0.20 مم)</button>
+      </div>
+
       <div class="calc-layout">
         <!-- إدخالات الحاسبة -->
         <div>
-          <!-- 1. معرض النماذج الجاهزة ورفع ملف STL -->
+          <!-- 1. تحميل وفحص ملفات STL و G-Code وتحليل الأبعاد والوزن ثلاثي الأبعاد -->
           <div class="calc-panel" style="margin-bottom:18px">
             <div class="calc-section-title">
-              <span>📐 النماذج الجاهزة وتحليل ملفات STL</span>
-              <span class="chip" style="margin-right:auto">3D Engine</span>
+              <span>📐 تحميل وفحص ملفات STL و G-Code (3D Engine)</span>
+              <span class="chip" style="margin-right:auto">تحليل فوري دقيق</span>
             </div>
 
-            <!-- كروت النماذج الجاهزة -->
-            <div class="model-preset-grid">
-              <button type="button" class="model-preset-card active" data-preset="3dbenchy" onclick="App.calcLoadPreset('3dbenchy')">
-                <div class="model-preset-title"><span>🚤</span><span>#3DBenchy Boat</span></div>
-                <div class="model-preset-meta">60 × 31 × 48 مم • 11.3 cm³</div>
-              </button>
-              <button type="button" class="model-preset-card" data-preset="multicolor-benchy" onclick="App.calcLoadPreset('multicolor-benchy')">
-                <div class="model-preset-title"><span>🎨</span><span>Multi-Color Benchy</span></div>
-                <div class="model-preset-meta">48 تبديلة لون • Prime Tower</div>
-              </button>
-              <button type="button" class="model-preset-card" data-preset="large-hex-vase" onclick="App.calcLoadPreset('large-hex-vase')">
-                <div class="model-preset-title"><span>🏺</span><span>Large Hex Vase</span></div>
-                <div class="model-preset-meta">95 × 95 × 160 مم • Vase Mode</div>
-              </button>
-              <button type="button" class="model-preset-card" data-preset="voron-housing" onclick="App.calcLoadPreset('voron-housing')">
-                <div class="model-preset-title"><span>🖨️</span><span>Voron 2.4 Housing</span></div>
-                <div class="model-preset-meta">120 × 85 × 45 مم • ABS ميكانيكي</div>
-              </button>
-            </div>
-
-            <!-- منطقة رفع ملف STL من الجهاز -->
+            <!-- منطقة رفع ملف STL أو G-Code من الجهاز -->
             <div class="stl-dropzone" id="stl-dropzone" onclick="document.getElementById('stl-file-input').click()">
-              <input type="file" id="stl-file-input" accept=".stl,.STL" style="display:none" onchange="App.calcHandleFileUpload(event)">
-              <div style="font-size:24px">📂</div>
-              <div style="font-weight:700; font-size:0.9rem">اضغط هنا لرفع ملف STL من جهازك أو اسحبه وأفلته هنا</div>
-              <div style="font-size:0.75rem; color:var(--text-muted)">تحليل فوري دقيق للأبعاد والحجم والمثلثات والوزن دون الحاجة لبرامج خارجية</div>
+              <input type="file" id="stl-file-input" accept=".stl,.STL,.gcode,.GCODE,.gco,.nc" style="display:none" onchange="App.calcHandleFileUpload(event)">
+              <div class="stl-dropzone-icon">📥</div>
+              <div class="stl-dropzone-title">اضغط لاختيار ملف STL أو G-Code أو اسحبه وأفلته هنا مباشرة</div>
+              <div class="stl-dropzone-desc">تحليل هندسي فوري للأبعاد (X × Y × Z) والحجم والمثلثات لـ STL، أو استخراج فوري للوزن والوقت بدقة من ملفات G-Code</div>
+              <div class="stl-dropzone-badges">
+                <span class="stl-tag">Binary STL</span>
+                <span class="stl-tag">ASCII STL</span>
+                <span class="stl-tag">G-Code Slicer Parser</span>
+                <span class="stl-tag">معاينة 3D فورية</span>
+              </div>
             </div>
 
             <!-- شاشة العرض ثلاثي الأبعاد WebGL Viewport -->
             <div class="calc-3d-viewport" id="calc-viewport-container">
               <canvas id="calc-3d-canvas" class="calc-3d-canvas"></canvas>
               <div class="viewport-controls-bar">
-                <span class="viewport-pill" id="viewport-model-name">🚤 #3DBenchy Boat</span>
+                <span class="viewport-pill" id="viewport-model-name">📦 نموذج معاينة ثلاثي الأبعاد</span>
                 <div style="display:flex; gap:6px; pointer-events:auto">
                   <button type="button" class="viewport-btn" onclick="App.calcToggleWireframe()">🕸️ الشبك (Wireframe)</button>
                   <button type="button" class="viewport-btn" onclick="App.calcResetCamera()">🔄 ضبط الزاوية</button>
@@ -679,14 +694,20 @@
               <div class="form-group">
                 <label class="form-label">نوع خامة الفلمنت</label>
                 <select id="calc-material" class="form-control" onchange="App.onCalcMaterialChange()">
-                  <option value="pla_plus">PLA+ (Tough PLA - مقاوم للصدمات)</option>
-                  <option value="pla">PLA (قياسي لديكور والهدايا)</option>
-                  <option value="petg">PETG (مقاوم للحرارة والرطوبة)</option>
-                  <option value="abs">ABS (ميكانيكي قوي ومقاوم للحرارة)</option>
-                  <option value="tpu">TPU 95A (مطاطي مرن للصدمات)</option>
-                  <option value="asa">ASA (مقاوم للشمس UV والأجواء الخارجية)</option>
-                  <option value="nylon">Nylon PA (فائق الصلابة ومقاوم للاحتكاك)</option>
-                  <option value="pc">PC (بولي كربونات فائق المتانة)</option>
+                  <option value="patron_pla_plus" selected>🇪🇬 Patron 3D PLA+ (محلي مقوى - 700 ج.م)</option>
+                  <option value="patron_pla">🇪🇬 Patron 3D PLA (محلي اقتصادي - 600 ج.م)</option>
+                  <option value="patron_petg">🇪🇬 Patron 3D PETG (محلي مقاوم للحرارة - 650 ج.م)</option>
+                  <option value="patron_abs">🇪🇬 Patron 3D ABS (محلي ميكانيكي - 750 ج.م)</option>
+                  <option value="patron_tpu">🇪🇬 Patron 3D TPU 95A (محلي مرن - 950 ج.م)</option>
+                  <option value="esun_pla_plus">eSUN PLA+ (مستورد معتمد - 950 ج.م)</option>
+                  <option value="pla_plus">PLA+ Standard (950 ج.م)</option>
+                  <option value="pla">PLA Standard (900 ج.م)</option>
+                  <option value="petg">PETG Standard (950 ج.م)</option>
+                  <option value="abs">ABS Standard (920 ج.م)</option>
+                  <option value="tpu">TPU 95A Standard (1450 ج.م)</option>
+                  <option value="asa">ASA UV Standard (1350 ج.م)</option>
+                  <option value="nylon">Nylon PA (2150 ج.م)</option>
+                  <option value="pc">PC Polycarbonate (2000 ج.م)</option>
                 </select>
               </div>
               <div class="form-group">
@@ -726,6 +747,57 @@
                   <option value="0.20" selected>0.20 مم (القياسي - Standard)</option>
                   <option value="0.28">0.28 مم (طباعة سريعة - Draft)</option>
                 </select>
+              </div>
+            </div>
+
+            <!-- قطر الفوهة ونمط الحشو المتقدمين -->
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">قطر الفوهة (Nozzle Diameter)</label>
+                <select id="calc-nozzle" class="form-control" onchange="App.calcUpdate()">
+                  <option value="0.2">0.2 مم (فائق النعومة للمجسمات الدقيقة)</option>
+                  <option value="0.4" selected>0.4 مم (القياسي المعتمد - Standard)</option>
+                  <option value="0.6">0.6 مم (تدفق مرتفع وطباعة سريعة متينة)</option>
+                  <option value="0.8">0.8 مم (فائق السرعة للقطع الهيكلية الكبيرة)</option>
+                </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">نمط الحشو الداخلي (Infill Pattern)</label>
+                <select id="calc-infill-pattern" class="form-control" onchange="App.calcUpdate()">
+                  <option value="grid" selected>Grid (شبكي متوازن - قياسي)</option>
+                  <option value="gyroid">Gyroid (متساوي الخواص ومتانة ميكانيكية فائقة)</option>
+                  <option value="honeycomb">Honeycomb (خلية نحل - صلابة عالية ووزن خفيف)</option>
+                  <option value="lines">Lines / Rectilinear (خطي اقتصادي سريع)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- مفتاح التحويل للإدخال اليدوي المباشر (Manual Overrides) -->
+            <div class="toggle-box" style="margin-top:14px; margin-bottom:0">
+              <div class="toggle-header" onclick="App.calcToggleManualOverride()">
+                <div style="font-weight:700; font-size:0.85rem; display:flex; align-items:center; gap:8px">
+                  <span>✍️ مفتاح الإدخال اليدوي المباشر للوزن والزمن (Manual Overrides)</span>
+                  <span class="chip" id="chip-manual-override-status">معطل</span>
+                </div>
+                <input type="checkbox" id="calc-manual-override-toggle" style="cursor:pointer" onclick="event.stopPropagation(); App.calcToggleManualOverride()">
+              </div>
+              <div id="manual-override-fields" style="display:none; margin-top:14px; padding-top:12px; border-top:1px solid var(--border)">
+                <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px">
+                  عند التفعيل، يمكنك كتابة وزن القطعة الصافي وزمن الطباعة يدوياً بالساعات والدقائق مباشرة بدلاً من الحساب الحركي التلقائي.
+                </p>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label class="form-label">الوزن الصافي المخصص (جرام)</label>
+                    <input type="number" id="calc-manual-weight-input" class="form-control" placeholder="مثال: 45.0" step="0.1" min="0.1" oninput="App.calcUpdate()">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">زمن الطباعة المخصص للقطعة</label>
+                    <div style="display:flex; gap:8px">
+                      <input type="number" id="calc-manual-hours-input" class="form-control" placeholder="ساعات" min="0" step="1" oninput="App.calcUpdate()">
+                      <input type="number" id="calc-manual-mins-input" class="form-control" placeholder="دقائق" min="0" max="59" step="1" oninput="App.calcUpdate()">
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -901,6 +973,27 @@
             </div>
           </div>
 
+          <!-- شريط توزيع التكلفة والأرباح البصري التفاعلي -->
+          <div class="cost-breakdown-box">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:0.75rem; font-weight:700; margin-bottom:6px">
+              <span>📊 توزيع عناصر السعر المقترح</span>
+              <span style="color:var(--accent)" id="calc-out-bar-summary">خامة: 0% • ربح: 0%</span>
+            </div>
+            <div class="cost-bar-track">
+              <div class="cost-bar-seg seg-mat" id="bar-seg-mat" style="width: 25%" title="خامة الفلمنت"></div>
+              <div class="cost-bar-seg seg-machine" id="bar-seg-machine" style="width: 20%" title="الكهرباء والماكينة"></div>
+              <div class="cost-bar-seg seg-labor" id="bar-seg-labor" style="width: 15%" title="العمالة والتشطيب"></div>
+              <div class="cost-bar-seg seg-risk" id="bar-seg-risk" style="width: 5%" title="احتياطي الفشل"></div>
+              <div class="cost-bar-seg seg-profit" id="bar-seg-profit" style="width: 35%" title="صافي الربح"></div>
+            </div>
+            <div class="cost-bar-legend">
+              <span class="legend-item"><span class="legend-dot dot-mat"></span>خامة <b id="bar-val-mat">0%</b></span>
+              <span class="legend-item"><span class="legend-dot dot-machine"></span>تشغيل <b id="bar-val-machine">0%</b></span>
+              <span class="legend-item"><span class="legend-dot dot-labor"></span>عمالة <b id="bar-val-labor">0%</b></span>
+              <span class="legend-item"><span class="legend-dot dot-profit"></span>أرباح <b id="bar-val-profit">0%</b></span>
+            </div>
+          </div>
+
           <div class="calc-result-body">
             <div class="calc-result-row">
               <span class="r-label">🧵 تكلفة الخامة الصافية</span>
@@ -964,8 +1057,458 @@
               <span>ربح/ساعة: <strong id="calc-out-per-hour" style="color:var(--accent-2)">0</strong></span>
               <span>Markup: <strong id="calc-out-markup" style="color:var(--accent)">0%</strong></span>
             </div>
+            <button class="btn btn-primary btn-full btn-sm" onclick="App.openPrintableInvoice()">📄 عرض الفاتورة وعرض السعر الرسمي (Print / PDF)</button>
             <button class="btn btn-success btn-full" onclick="App.calcSaveAsQuote()">💾 حفظ كعرض سعر رسمي في النظام</button>
             <button class="btn btn-secondary btn-full btn-sm" onclick="App.calcCopyWhatsapp()">📱 نسخ رسالة واتساب للعميل</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- تبويب تجميعات القطع المتعددة (Multi-Part Assembly) -->
+    <section id="tab-assembly" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>🧩 تجميعات القطع المتعددة (Multi-Part Assembly)</h1>
+          <p>إدارة وحساب تكلفة المشاريع والمجسمات المركبة من عدة أجزاء منفصلة وحساب السعر الإجمالي للمنتج النهائي</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-success" onclick="App.assemblySaveAsQuote()">💾 تحويل التجميعة لعرض سعر</button>
+          <button class="btn btn-primary" onclick="App.assemblySaveAsProduct()">🏷️ حفظ كمنتج في الكتالوج</button>
+          <button class="btn btn-secondary" onclick="App.assemblyClear()">↺ تفريغ الأجزاء</button>
+        </div>
+      </div>
+
+      <div class="assembly-grid">
+        <!-- جدول الأجزاء المضافة ونموذج الإضافة -->
+        <div>
+          <!-- نموذج إضافة جزء -->
+          <div class="card" style="margin-bottom: 20px;">
+            <div class="card-header">
+              <div class="card-title">➕ إضافة جزء جديد للمشروع</div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">اسم الجزء / المكون *</label>
+                <input type="text" id="assembly-part-name" class="form-control" placeholder="مثال: الهيكل الأساسي، الغطاء العلوي، الذراع">
+              </div>
+              <div class="form-group">
+                <label class="form-label">الخامة المستخدمة</label>
+                <select id="assembly-part-material" class="form-control">
+                  <option value="patron_pla_plus">Patron 3D PLA+ (محلي)</option>
+                  <option value="patron_pla">Patron 3D PLA (محلي)</option>
+                  <option value="patron_petg">Patron 3D PETG (محلي)</option>
+                  <option value="patron_abs">Patron 3D ABS (محلي)</option>
+                  <option value="esun_pla_plus">eSUN PLA+ (مستورد)</option>
+                  <option value="tpu">TPU 95A (مرن)</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">وزن الجزء الصافي (جرام) *</label>
+                <input type="number" id="assembly-part-weight" class="form-control" placeholder="مثال: 45.0" step="0.1" min="0.1">
+              </div>
+              <div class="form-group">
+                <label class="form-label">زمن طباعة الجزء (ساعات) *</label>
+                <input type="number" id="assembly-part-hours" class="form-control" placeholder="مثال: 2.5" step="0.1" min="0.1">
+              </div>
+            </div>
+            <div class="form-row" style="align-items: flex-end;">
+              <div class="form-group">
+                <label class="form-label">الكمية المطلوبة من هذا الجزء في التجميعة</label>
+                <input type="number" id="assembly-part-qty" class="form-control" value="1" min="1">
+              </div>
+              <div class="form-group">
+                <button type="button" class="btn btn-primary btn-full" onclick="App.assemblyAddPart()">+ أضف الجزء للتجميعة</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- قائمة أجزاء التجميعة -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">📋 أجزاء ومكونات التجميعة الحالية (<span id="assembly-parts-count">0</span> أجزاء)</div>
+            </div>
+            <div class="table-responsive">
+              <table id="assembly-table">
+                <thead>
+                  <tr>
+                    <th>الجزء</th>
+                    <th>الخامة</th>
+                    <th>الوزن/قطعة</th>
+                    <th>الزمن/قطعة</th>
+                    <th>العدد</th>
+                    <th>إجمالي الوزن</th>
+                    <th>إجمالي الزمن</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="assembly-table-body">
+                  <tr>
+                    <td colspan="8" style="text-align:center; padding:30px; color:var(--text-muted)">
+                      لم تتم إضافة أجزاء للتجميعة بعد. استخدم النموذج أعلاه لإضافة مكونات المجسم.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- بطاقة ملخص التجميعة الإجمالي -->
+        <div>
+          <div class="calc-result-card">
+            <div class="calc-result-header">
+              <h3>📦 ملخص التجميعة الكاملة</h3>
+              <p style="font-size:0.78rem; color:var(--text-muted); margin-top:2px">شامل جميع الأجزاء والقطع المكونة للمجسم</p>
+              <div class="calc-result-price">
+                <span class="currency">ج.م</span>
+                <span id="assembly-total-price">0.00</span>
+              </div>
+            </div>
+            <div class="calc-result-body">
+              <div class="calc-result-row">
+                <span class="r-label">🧩 إجمالي عدد القطع</span>
+                <span class="r-value" id="assembly-total-pieces">0 قطعة</span>
+              </div>
+              <div class="calc-result-row">
+                <span class="r-label">⚖️ إجمالي وزن الفلمنت</span>
+                <span class="r-value" id="assembly-total-weight">0.0 g</span>
+              </div>
+              <div class="calc-result-row">
+                <span class="r-label">⏱️ إجمالي ساعات الطباعة</span>
+                <span class="r-value" id="assembly-total-hours">0.0 ساعة</span>
+              </div>
+              <div class="calc-result-row">
+                <span class="r-label">🧵 تكلفة الخامات المباشرة</span>
+                <span class="r-value" id="assembly-cost-material">0.00 ج.م</span>
+              </div>
+              <div class="calc-result-row">
+                <span class="r-label">⚡ كهرباء وصيانة وإهلاك</span>
+                <span class="r-value" id="assembly-cost-machine">0.00 ج.م</span>
+              </div>
+              <div class="divider"></div>
+              <div class="calc-result-row r-total">
+                <span class="r-label">💰 إجمالي تكلفة تصنيع التجميعة</span>
+                <span class="r-value" id="assembly-total-cost">0.00 ج.م</span>
+              </div>
+              <div class="calc-result-row" style="color:var(--green)">
+                <span class="r-label">💵 صافي ربح التجميعة</span>
+                <span class="r-value" id="assembly-total-profit">0.00 ج.م</span>
+              </div>
+            </div>
+            <div class="calc-result-footer">
+              <button class="btn btn-success btn-full" onclick="App.assemblySaveAsQuote()">💾 حفظ كعرض سعر رسمي في النظام</button>
+              <button class="btn btn-secondary btn-full btn-sm" onclick="App.assemblySaveAsProduct()">🏷️ تسجيل كمنتج جاهز بالكتالوج</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- تبويب استرداد الاستثمار ونقطة التعادل (ROI & Payback Calculator) -->
+    <section id="tab-roi" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>💡 تحليل العائد على الاستثمار ونقطة التعادل (ROI & Payback)</h1>
+          <p>حساب دقيق لعدد القطع وساعات التشغيل اللازمة لاسترداد رأس مال الطابعة ومعدل الأرباح الشهرية</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.roiCalculate()">⚡ إعادة الحساب</button>
+        </div>
+      </div>
+
+      <!-- شبكة بطاقات مؤشرات استرداد الاستثمار -->
+      <div class="roi-metric-grid">
+        <div class="roi-card">
+          <span style="font-size:0.8rem; color:var(--text-muted); font-weight:700">🎯 عدد القطع لاسترداد الثمن (Payback Units)</span>
+          <div class="val" id="roi-out-units" style="color:var(--accent)">0 قطعة</div>
+          <span style="font-size:0.75rem; color:var(--text-muted)">للوصول لنقطة التعادل التام Break-Even</span>
+        </div>
+        <div class="roi-card">
+          <span style="font-size:0.8rem; color:var(--text-muted); font-weight:700">⏱️ ساعات تشغيل الاسترداد (Payback Hours)</span>
+          <div class="val" id="roi-out-hours" style="color:var(--orange)">0 ساعة</div>
+          <span style="font-size:0.75rem; color:var(--text-muted)">إجمالي ساعات عمل الطابعة المطلوبة</span>
+        </div>
+        <div class="roi-card">
+          <span style="font-size:0.8rem; color:var(--text-muted); font-weight:700">💵 صافي الأرباح الشهرية المقدرة</span>
+          <div class="val" id="roi-out-monthly-profit" style="color:var(--green)">0 ج.م</div>
+          <span style="font-size:0.75rem; color:var(--text-muted)">بناءً على معدل الطلبات الشهري المتوقع</span>
+        </div>
+        <div class="roi-card">
+          <span style="font-size:0.8rem; color:var(--text-muted); font-weight:700">📅 مدة الاسترداد المتوقعة (Months)</span>
+          <div class="val" id="roi-out-months" style="color:var(--accent-2)">0 شهر</div>
+          <span style="font-size:0.75rem; color:var(--text-muted)">حتى يغطي المشروع تكلفته التأسيسية</span>
+        </div>
+      </div>
+
+      <div class="calc-layout">
+        <!-- مدخلات حساب العائد -->
+        <div class="calc-panel">
+          <div class="calc-section-title">⚙️ معطيات الطابعة والتشغيل للورشة</div>
+          
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">سعر شراء الطابعة مع الشحن والتأسيس (ج.م)</label>
+              <input type="number" id="roi-printer-cost" class="form-control" value="26000" step="500" oninput="App.roiCalculate()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">العمر الافتراضي التشغيلي للطابعة (ساعات)</label>
+              <input type="number" id="roi-printer-life" class="form-control" value="5000" step="500" oninput="App.roiCalculate()">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">متوسط صافي ربح القطعة الواحدة (ج.م)</label>
+              <input type="number" id="roi-avg-profit" class="form-control" value="85" step="5" oninput="App.roiCalculate()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">متوسط وقت طباعة القطعة الواحدة (ساعات)</label>
+              <input type="number" id="roi-avg-hours" class="form-control" value="2.5" step="0.1" oninput="App.roiCalculate()">
+            </div>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label class="form-label">الطلبات المتوقعة شهرياً (عدد القطع المبيعة/شهر)</label>
+              <input type="number" id="roi-monthly-volume" class="form-control" value="35" min="1" oninput="App.roiCalculate()">
+            </div>
+            <div class="form-group">
+              <label class="form-label">ساعات تشغيل الطابعة اليومية المتاحة (ساعات/يوم)</label>
+              <input type="number" id="roi-daily-hours" class="form-control" value="10" min="1" max="24" oninput="App.roiCalculate()">
+            </div>
+          </div>
+        </div>
+
+        <!-- بطاقة شريط التقدم الفعلي نحو التعادل من أرباح الورشة -->
+        <div class="card">
+          <div class="card-header">
+            <div class="card-title">📈 الموقف المالي الفعلي للورشة</div>
+          </div>
+          <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:12px">
+            مقارنة أرباح الطلبات المنفذة فعلياً بالنظام مقابل تكلفة شراء الطابعة:
+          </p>
+          <div style="display:flex; justify-content:space-between; font-weight:800; font-size:0.9rem">
+            <span>الأرباح المحققة: <span id="roi-actual-profit" style="color:var(--green)">0 ج.م</span></span>
+            <span>المستهدف: <span id="roi-target-cost" style="color:var(--text-primary)">26,000 ج.م</span></span>
+          </div>
+          <div class="roi-progress-track">
+            <div class="roi-progress-fill" id="roi-progress-fill" style="width: 0%"></div>
+          </div>
+          <div style="font-size:0.78rem; color:var(--text-muted); margin-top:8px; text-align:left">
+            نسبة الاسترداد المحققة: <strong id="roi-progress-pct" style="color:var(--accent)">0%</strong>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- تبويب طلبات العملاء الخارجية الواردة من Web (order.html) -->
+    <section id="tab-customer-orders" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>📥 طلبات العملاء الخارجية (Web Orders Inbox)</h1>
+          <p>الطلبات المقدمة عبر صفحة العميل المستقلة (order.html) والمرتبطة بقاعدة بيانات Google Sheets</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="App.customerOrdersFetch()">🔄 تحديث وجلب الطلبات</button>
+          <a href="order.html" target="_blank" class="btn btn-secondary">🌐 فتح صفحة العميل (order.html)</a>
+        </div>
+      </div>
+
+      <!-- شريط إعدادات الربط السحابي -->
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="card-header">
+          <div class="card-title">🔗 إعدادات الربط السحابي (Google Sheets / Apps Script)</div>
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label">رابط الـ Web App من Google Apps Script</label>
+            <input type="text" id="cust-orders-url" class="form-control" placeholder="https://script.google.com/macros/s/.../exec" onchange="App.customerOrdersSaveConfig()">
+          </div>
+          <div class="form-group">
+            <label class="form-label">كلمة السر الإدارية (Admin Secret Key)</label>
+            <input type="password" id="cust-orders-key" class="form-control" placeholder="المعرفة في Code.gs" onchange="App.customerOrdersSaveConfig()">
+          </div>
+        </div>
+        <p style="font-size:0.75rem; color:var(--text-muted)">
+          💡 راجع كود <a href="file:///backend/Code.gs" style="color:var(--accent); font-weight:700">backend/Code.gs</a> لخطوات إنشاء Google Sheet وربطه بدون أي تكاليف سيرفر.
+        </p>
+      </div>
+
+      <!-- جدول الطلبات الواردة -->
+      <div class="card">
+        <div class="card-header">
+          <div class="card-title">📬 الطلبات الواردة من العملاء (<span id="cust-orders-count">0</span> طلب)</div>
+        </div>
+        <div class="table-responsive">
+          <table>
+            <thead>
+              <tr>
+                <th>كود المتابعة</th>
+                <th>التاريخ</th>
+                <th>العميل</th>
+                <th>الهاتف</th>
+                <th>اسم القطعة</th>
+                <th>الملف المرفق</th>
+                <th>الوزن المقدر</th>
+                <th>السعر التلقائي</th>
+                <th>الحالة</th>
+                <th>الإجراء</th>
+              </tr>
+            </thead>
+            <tbody id="cust-orders-tbody">
+              <tr>
+                <td colspan="10" style="text-align:center; padding:30px; color:var(--text-muted)">
+                  لم يتم جلب طلبات بعد. تأكد من إعداد رابط Google Apps Script واضغط "تحديث وجلب الطلبات".
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- تبويب دليل استكشاف الأعطال والمعايرة الشامل (Troubleshooting Manual) -->
+    <section id="tab-troubleshoot" class="tab-pane">
+      <div class="top-bar">
+        <div class="page-title">
+          <h1>🛠️ الدليل الهندسي لمعايرة الطابعة واستكشاف الأعطال</h1>
+          <p>دليل صيانة ومعايرة ميكانيكية وحرارية شامل معتمد لطابعات Elegoo Neptune 4 Pro ونظام Klipper</p>
+        </div>
+        <div class="top-actions">
+          <button class="btn btn-primary" onclick="window.print()">🖨️ طباعة الدليل الورقي</button>
+        </div>
+      </div>
+
+      <div class="troubleshoot-grid">
+        <!-- 1. المعايرة الميكانيكية -->
+        <div class="trouble-card">
+          <div class="trouble-card-header">
+            <div class="trouble-icon">🔩</div>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem">1. المعايرة الميكانيكية والسيور</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">POM Wheels & Gantry Alignment</div>
+            </div>
+          </div>
+          <div class="trouble-solution-box">
+            <b>عجلات POM:</b> يجب ضبط الصواميل اللامركزية (Eccentric Nuts) بحيث تدور العجلات باحتكاك خفيف دون أي تخلخل، مع إمكانية تحريكها بالإصبع بمقاومة معتدلة.
+          </div>
+          <div class="trouble-solution-box">
+            <b>شد السيور:</b> شد سيور محوري X و Y حتى تصدر نغمة منخفضة عند النقر (تردد 110-120Hz تقريباً). تجنب الشد الزائد لمنع إجهاد المحركات وتآكل السيور.
+          </div>
+          <div class="trouble-solution-box">
+            <b>توازي محور X:</b> تأكد من تساوي ارتفاع عارضة X عن قاعدة الطابعة من الجهتين اليسرى واليمنى بمسافة متطابقة تماماً باستخدام مسطرة دقيقة.
+          </div>
+        </div>
+
+        <!-- 2. استواء السرير والطبقة الأولى -->
+        <div class="trouble-card">
+          <div class="trouble-card-header">
+            <div class="trouble-icon">📐</div>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem">2. استواء السطح والطبقة الأولى</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">Bed Leveling & Z-Offset Squish</div>
+            </div>
+          </div>
+          <div class="trouble-solution-box">
+            <b>التسخين المسبق:</b> سخن السطح إلى 60°C والنوزل إلى 140°C واتركه 5 دقائق قبل المعايرة لتمدد المعادن الطبيعي قبل أخذ القراءات.
+          </div>
+          <div class="trouble-solution-box">
+            <b>اختبار الورقة (Manual 4 Corners):</b> اضبط البكرات اليدوية الأربع حتى تحتك الورقة برأس الطباعة بمقاومة خفيفة جداً، وكرر العملية 3 دورات متتالية.
+          </div>
+          <div class="trouble-solution-box">
+            <b>Z-Offset الحرج:</b> يجب أن تكون خطوط الطبقة الأولى مسطحة وملتحمة تماماً دون فراغات وبدون احتكاك مفرط يسبب نتوءات خشنة.
+          </div>
+        </div>
+
+        <!-- 3. معايرة البثق ومعدل التدفق -->
+        <div class="trouble-card">
+          <div class="trouble-card-header">
+            <div class="trouble-icon">🧵</div>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem">3. تدفق الفلمنت ومعايرة البثق</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">Rotation Distance & Flow Rate</div>
+            </div>
+          </div>
+          <div class="trouble-solution-box">
+            <b>Rotation Distance (E-Steps):</b> قس 100 مم على الفلمنت، واطلب بثق 100 مم عبر Klipper. إذا كان الفارق أكبر من 2 مم، عدل قيمة <code>rotation_distance</code> في <code>printer.cfg</code>.
+          </div>
+          <div class="trouble-solution-box">
+            <b>معدل التدفق (Flow Multiplier):</b> اضبط Flow Rate في برنامج التقطيع على 95-97% لخامة PLA+ للحصول على أبعاد دقيقة وأسطح علوية ناعمة خالية من الزيادات.
+          </div>
+          <div class="trouble-solution-box">
+            <b>معايرة PID للحرارة:</b> شغل أمر <code>PID_CALIBRATE HEATER=extruder TARGET=215</code> لتثبيت حرارة النوزل ومنع تذبذب درجات الحرارة أثناء السرعات العالية.
+          </div>
+        </div>
+
+        <!-- 4. معايرة التراجع والسحب -->
+        <div class="trouble-card">
+          <div class="trouble-card-header">
+            <div class="trouble-icon">⚡</div>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem">4. التراجع وسحب الخيوط</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">Direct Drive Retraction Tuning</div>
+            </div>
+          </div>
+          <div class="trouble-solution-box">
+            <b>مسافة التراجع (Distance):</b> لطابعة Neptune 4 Pro بنظام Direct Drive: المسافة المثالية هي 0.5 إلى 0.8 مم فقط. (لا تزيد أبداً عن 1.2 مم لمنع الانسداد بالهيت بريك).
+          </div>
+          <div class="trouble-solution-box">
+            <b>سرعة التراجع (Retract Speed):</b> اضبط السرعة على 45 مم/ثانية مع تفعيل خيار Z-Hop عند التنقل فوق الأجزاء المطبوعة بارتفاع 0.2 مم.
+          </div>
+          <div class="trouble-solution-box">
+            <b>تجفيف الفلمنت:</b> خيوط العنكبوت الشديدة سببها الأول رطوبة الفلمنت. جفف بكرات PLA عند 45-50°C و PETG/TPU عند 60-65°C لمدة 6 ساعات.
+          </div>
+        </div>
+
+        <!-- 5. مصفوفة حلول المشكلات الشائعة -->
+        <div class="trouble-card" style="grid-column: 1 / -1;">
+          <div class="trouble-card-header">
+            <div class="trouble-icon">🚨</div>
+            <div>
+              <div style="font-weight:800; font-size:0.95rem">5. جدول استكشاف وفحص الأعطال الفورية (Troubleshooting Matrix)</div>
+              <div style="font-size:0.75rem; color:var(--text-muted)">حلول سريعة لأهم مشاكل الطباعة في الورشة</div>
+            </div>
+          </div>
+          <div class="table-responsive">
+            <table>
+              <thead>
+                <tr>
+                  <th>العرض الملاحظ</th>
+                  <th>السبب العلمي الأساسي</th>
+                  <th>خطوة الإصلاح الفورية المعتمدة</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td style="font-weight:700; color:var(--red)">عدم التصاق الطبقة الأولى</td>
+                  <td>تراكم الزيوت الناتجة عن لمس السطح المغناطيسي PEI.</td>
+                  <td>غسل السطح بماء دافئ وصابون سائل وتجفيفه تماماً بدون لمسه، أو مسحه بكحول أيزوبروبيل 99%.</td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:var(--orange)">تقوس الحواف (Warping)</td>
+                  <td>تبريد سريع وغير متساوٍ يسبب انكماش زوايا المجسم.</td>
+                  <td>تقليل مروحة التبريد للطبقات الأولى لـ 0%، رفع حرارة السرير 5 درجات، واستخدام Brim حواف 5-8 مم.</td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:var(--red)">انسداد النوزل وطقطقة الأكسترودر</td>
+                  <td>تراكم شوائب محترقة أو حرارة منخفضة جداً مع سرعة تدفق عالية.</td>
+                  <td>سحب بارد (Cold Pull) عند 80°C أو استبدال فوهة النوزل وتنظيف الهيت بريك بإبرة التنظيف.</td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:var(--accent)">انزياح الطبقات (Layer Shift)</td>
+                  <td>ارتطام النوزل بالحشو المتراكم، أو ارتخاء سيور الحركة، أو تسارع مفرط.</td>
+                  <td>استخدام نمط حشو <strong>Gyroid</strong> غير متقاطع، وشد السيور لتردد 115Hz وتفعيل Z-Hop.</td>
+                </tr>
+                <tr>
+                  <td style="font-weight:700; color:var(--accent-2)">خيوط عنكبوتية كثيفة (Stringing)</td>
+                  <td>فلمنت رطب مشبع بالرطوبة أو حرارة طباعة أعلى من اللازم بـ 15 درجة.</td>
+                  <td>تجفيف الفلمنت في فرن تجفيف مناسب وخفض حرارة النوزل بمقدار 5 إلى 10 درجات مئوية.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
@@ -1303,6 +1846,35 @@
     </div>
   </div>
 
+  <!-- Modal الفاتورة وعرض السعر الرسمي القابل للطباعة وتصدير PDF -->
+  <div id="modal-printable-invoice" class="modal-overlay">
+    <div class="modal-card" style="max-width: 860px; max-height: 95vh;">
+      <div class="modal-header no-print">
+        <div style="display:flex; align-items:center; gap:8px">
+          <span style="font-size:22px">📄</span>
+          <h3 style="font-weight:800; font-size:1.05rem">عرض السعر والفاتورة الرسمية — ورشة ELMALHY.3D</h3>
+        </div>
+        <div style="display:flex; gap:8px; align-items:center">
+          <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ طباعة الفاتورة / تصدير PDF</button>
+          <button class="modal-close" onclick="App.closeModal('modal-printable-invoice')">✕</button>
+        </div>
+      </div>
+      
+      <!-- ورقة الفاتورة المجهزة للطباعة مقاس A4 -->
+      <div class="printable-invoice" id="printable-invoice-content">
+        <!-- تملأ برمجياً عبر App.renderPrintableInvoice() -->
+      </div>
+
+      <div class="modal-footer no-print" style="display:flex; justify-content:space-between; align-items:center; border-top:1px solid var(--border); padding-top:14px">
+        <span style="font-size:0.8rem; color:var(--text-muted)">💡 جاهزة للطباعة الورقية المباشرة أو الحفظ كملف PDF عالي الجودة</span>
+        <div style="display:flex; gap:8px">
+          <button class="btn btn-secondary btn-sm" onclick="App.calcCopyWhatsapp()">📱 نسخ رسالة واتساب</button>
+          <button class="btn btn-primary btn-sm" onclick="window.print()">🖨️ طباعة الآن</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="js/vendor/three.min.js"></script>
   <script src="js/core/db.js"></script>
@@ -1316,5 +1888,12 @@
   <script src="js/modules/dashboard.js"></script>
   <script src="js/modules/calculator.js"></script>
   <script src="js/app.js"></script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js').catch(e => console.log('SW registration skipped:', e));
+    });
+  }
+</script>
 </body>
 </html>

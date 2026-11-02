@@ -96,4 +96,51 @@ test('Calculator Module: calculateIntegrated computes 3D printing economics prop
   assert.ok(result.costs.suggestedRetailPrice > result.costs.totalManufacturingCost);
   assert.equal(result.costs.targetMarginPercent, 40);
   assert.equal(result.currency.code, 'EGP');
+  assert.ok(result.breakdown);
+  assert.ok(result.breakdown.profitPct > 0);
 });
+
+test('Calculator Module: manual overrides and nozzle/pattern controls work properly', () => {
+  const result = CalculatorModule.calculateIntegrated({
+    marketId: 'EG',
+    printerProfileId: 'neptune_4_pro',
+    materialId: 'pla',
+    solidVolumeMm3: 10000,
+    manualWeightOverride: true,
+    manualWeightGrams: 50,
+    manualTimeOverride: true,
+    manualPrintHours: 2.5,
+    nozzleDiameter: 0.6,
+    infillPattern: 'gyroid',
+    quantity: 2,
+    targetMarginPercent: 45
+  });
+
+  assert.equal(result.mass.netModelMassGrams, 50);
+  assert.equal(result.time.printHoursPerPiece, 2.5);
+  assert.equal(result.time.isManualOverride, true);
+  assert.ok(result.breakdown.materialPct > 0);
+  assert.ok(result.breakdown.machinePct > 0);
+  assert.ok(result.breakdown.profitPct > 0);
+});
+
+test('Calc: parseGCode extracts grams, time and layer height from slicer comments', () => {
+  const sampleCura = `
+;Generated with Cura_SteamEngine 5.4.0
+;TIME:7200
+;Filament used: 45.5m
+;Filament weight = 55.4g
+;Layer height: 0.28
+G21 ;metric values
+G90 ;absolute positioning
+M82 ;set extruder to absolute mode
+  `;
+
+  const parsed = Calc.parseGCode(sampleCura);
+  assert.ok(parsed);
+  assert.equal(parsed.filamentGrams, 55.4);
+  assert.equal(parsed.printTimeSeconds, 7200);
+  assert.equal(parsed.printHours, 2);
+  assert.equal(parsed.layerHeight, 0.28);
+});
+

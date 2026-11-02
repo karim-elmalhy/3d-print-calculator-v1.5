@@ -544,6 +544,79 @@
     };
   }
 
+  function parseGCode(text) {
+    if (typeof text !== 'string') return null;
+
+    let filamentGrams = 0;
+    let printTimeSeconds = 0;
+    let layerHeight = 0.2;
+
+    // 1. Filament weight in grams
+    const mG = text.match(/;\s*(?:total\s+)?filament\s+used\s*\[g\]\s*=\s*([\d.]+)/i) ||
+               text.match(/;\s*filament_used_g\s*=\s*([\d.]+)/i) ||
+               text.match(/;\s*(?:total_)?filament_weight\s*[:=]\s*([\d.]+)/i) ||
+               text.match(/;\s*material_weight\s*[:=]\s*([\d.]+)/i) ||
+               text.match(/;\s*Filament used:\s*([\d.]+)\s*g/i) ||
+               text.match(/;\s*Filament used:\s*([\d.]+)\s*grams/i) ||
+               text.match(/;\s*Filament weight\s*[:=]\s*([\d.]+)\s*g/i);
+
+    if (mG) {
+      filamentGrams = parseFloat(mG[1]);
+    } else {
+      // Volume in cm3
+      const mCm3 = text.match(/;\s*filament\s+used\s*\[cm3\]\s*=\s*([\d.]+)/i) ||
+                   text.match(/;\s*Filament volume\s*[:=]\s*([\d.]+)\s*cm3/i);
+      if (mCm3) {
+        filamentGrams = parseFloat(mCm3[1]) * 1.24;
+      } else {
+        // Length in meters for 1.75mm filament
+        const mM = text.match(/;\s*Filament used:\s*([\d.]+)\s*m\b/i) ||
+                   text.match(/;\s*Filament length\s*[:=]\s*([\d.]+)\s*m\b/i);
+        if (mM) {
+          filamentGrams = parseFloat(mM[1]) * 2.98;
+        } else {
+          const mMm = text.match(/;\s*(?:total\s+)?filament\s+used\s*\[mm\]\s*=\s*([\d.]+)/i) ||
+                      text.match(/;\s*Filament used:\s*([\d.]+)\s*mm\b/i) ||
+                      text.match(/;\s*Filament length\s*[:=]\s*([\d.]+)\s*mm\b/i);
+          if (mMm) filamentGrams = (parseFloat(mMm[1]) / 1000.0) * 2.98;
+        }
+      }
+    }
+
+    // 2. Print time in seconds
+    const mSec = text.match(/;\s*(?:TIME|print_time|PRINT\.TIME|TIME_ELAPSED)\s*:\s*(\d+)/i) ||
+                 text.match(/;\s*estimated printing time[^=]*=\s*(\d+)\s*s/i);
+    if (mSec) {
+      printTimeSeconds = parseInt(mSec[1], 10);
+    } else {
+      const mStr = text.match(/;\s*(?:estimated printing time|model printing time|total estimated time|Build time|Print time)[^=:]*[=:]\s*([^\n\r]+)/i);
+      if (mStr) {
+        const raw = mStr[1];
+        let h = 0, m = 0, s = 0;
+        const hM = raw.match(/(\d+)\s*(?:h|hour|hours|ساعة|ساعات)/i);
+        const mM = raw.match(/(\d+)\s*(?:m|min|minute|minutes|دقيقة|دقائق)/i);
+        const sM = raw.match(/(\d+)\s*(?:s|sec|second|seconds|ثانية)/i);
+        if (hM) h = parseInt(hM[1], 10);
+        if (mM) m = parseInt(mM[1], 10);
+        if (sM) s = parseInt(sM[1], 10);
+        printTimeSeconds = h * 3600 + m * 60 + s;
+      }
+    }
+
+    // 3. Layer height
+    const mLayer = text.match(/;\s*(?:layer_height|Layer height)\s*[:=]\s*([\d.]+)/i);
+    if (mLayer) {
+      layerHeight = parseFloat(mLayer[1]);
+    }
+
+    return {
+      filamentGrams: round(filamentGrams, 2),
+      printTimeSeconds: printTimeSeconds,
+      printHours: round(printTimeSeconds / 3600, 2),
+      layerHeight: round(layerHeight, 2)
+    };
+  }
+
   return {
     calculateCost,
     compareEstimatedVsActual,
@@ -554,6 +627,7 @@
     calculateMultiColorWaste,
     calculatePlateNesting,
     estimatePrintTime,
-    parseSTL
+    parseSTL,
+    parseGCode
   };
 });
