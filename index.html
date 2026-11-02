@@ -22,8 +22,19 @@
         <div class="brand-title">ELMALHY.3D</div>
         <div class="brand-subtitle">Workshop Manager v3.0</div>
       </div>
+      <button type="button" class="theme-toggle-btn" id="theme-toggle-btn" onclick="App.toggleTheme()" title="تبديل الثيم نهاري / ليلي">
+        <span id="theme-icon">🌙</span>
+      </button>
     </div>
 
+    
+    <!-- شريط البحث المركزي السريع Spotlight -->
+    <div style="padding: 10px 14px; border-bottom: 1px solid var(--border);">
+      <button type="button" class="spotlight-trigger-btn" onclick="App.openSpotlight()">
+        <span>🔍 بحث في النظام...</span>
+        <span class="spotlight-kbd">Ctrl+K</span>
+      </button>
+    </div>
     <ul class="nav-menu">
       <li class="nav-item active" data-tab="dashboard">
         <button><span class="nav-icon">📊</span><span>لوحة التحكم</span></button>
@@ -2040,5 +2051,24 @@
     });
   }
 </script>
+
+  <!-- نافذة البحث المركزي العام ولوحة الأوامر الذكية (Spotlight / Command Palette) -->
+  <div id="modal-spotlight" class="spotlight-overlay" onclick="if(event.target === this) App.closeSpotlight()">
+    <div class="spotlight-card">
+      <div class="spotlight-header">
+        <span style="font-size:22px">🔍</span>
+        <input type="text" id="spotlight-input" class="spotlight-input" placeholder="ابحث عن طلب، عميل، منتج SKU، خامة، أو أمر سريع..." oninput="App.onSpotlightInput(this.value)">
+        <span class="spotlight-kbd">ESC للإغلاق</span>
+      </div>
+      <div class="spotlight-results" id="spotlight-results">
+        <!-- تملأ برمجياً عبر App.onSpotlightInput() -->
+      </div>
+      <div class="spotlight-footer">
+        <span>💡 استخدم الأسهم <kbd class="spotlight-kbd">↑</kbd> <kbd class="spotlight-kbd">↓</kbd> للتنقل واضغط <kbd class="spotlight-kbd">Enter</kbd> للاختيار</span>
+        <span style="color:var(--accent); font-weight:700">ورشة ELMALHY.3D</span>
+      </div>
+    </div>
+  </div>
+
 </body>
 </html>

@@ -24,6 +24,8 @@
       this.renderCurrentTab();
       this.subscribeEvents();
       this.initCalculator();
+      this.initTheme();
+      this.initSpotlightListeners();
       this.initCustomerOrdersConfig();
       console.log('ELMALHY.3D Workshop Manager initialized successfully.');
     },
@@ -2367,6 +2369,334 @@
       document.getElementById('order-product-select').value = prod.id;
       this.onOrderProductSelected();
     },
+
+
+    // ==========================================
+    // Theme Switcher Controller (Light / Dark)
+    // ==========================================
+    _currentTheme: 'light',
+
+    initTheme() {
+      const saved = localStorage.getItem('elmalhy_theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const theme = saved || (prefersDark ? 'dark' : 'light');
+      this.setTheme(theme, false);
+    },
+
+    setTheme(theme, save = true) {
+      this._currentTheme = theme;
+      if (theme === 'dark') {
+        document.documentElement.setAttribute('data-theme', 'dark');
+        const icon = document.getElementById('theme-icon');
+        if (icon) icon.textContent = '☀️';
+      } else {
+        document.documentElement.removeAttribute('data-theme');
+        const icon = document.getElementById('theme-icon');
+        if (icon) icon.textContent = '🌙';
+      }
+
+      if (save) {
+        localStorage.setItem('elmalhy_theme', theme);
+      }
+
+      // Update 3D canvas background color
+      const isDark = theme === 'dark';
+      const bgColor = isDark ? 0x090d16 : 0xf8fafc;
+      if (this._main3DViewer && this._main3DViewer.scene) {
+        this._main3DViewer.scene.background = new THREE.Color(bgColor);
+      }
+      if (this._product3DViewer && this._product3DViewer.scene) {
+        this._product3DViewer.scene.background = new THREE.Color(bgColor);
+      }
+    },
+
+    toggleTheme() {
+      const newTheme = this._currentTheme === 'dark' ? 'light' : 'dark';
+      this.setTheme(newTheme, true);
+    },
+
+    // ==========================================
+    // Global Spotlight / Command Palette (Ctrl+K)
+    // ==========================================
+    _spotlightSelectedIndex: -1,
+    _spotlightCurrentItems: [],
+
+    initSpotlightListeners() {
+      document.addEventListener('keydown', (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+          e.preventDefault();
+          this.toggleSpotlight();
+        } else if (e.key === 'Escape' && document.getElementById('modal-spotlight')?.classList.contains('active')) {
+          this.closeSpotlight();
+        } else if (document.getElementById('modal-spotlight')?.classList.contains('active')) {
+          if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            this.spotlightMoveSelection(1);
+          } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            this.spotlightMoveSelection(-1);
+          } else if (e.key === 'Enter') {
+            e.preventDefault();
+            this.spotlightExecuteSelected();
+          }
+        }
+      });
+    },
+
+    openSpotlight() {
+      const modal = document.getElementById('modal-spotlight');
+      const input = document.getElementById('spotlight-input');
+      if (modal && input) {
+        modal.classList.add('active');
+        input.value = '';
+        input.focus();
+        this.onSpotlightInput('');
+      }
+    },
+
+    closeSpotlight() {
+      const modal = document.getElementById('modal-spotlight');
+      if (modal) modal.classList.remove('active');
+    },
+
+    toggleSpotlight() {
+      const modal = document.getElementById('modal-spotlight');
+      if (modal?.classList.contains('active')) {
+        this.closeSpotlight();
+      } else {
+        this.openSpotlight();
+      }
+    },
+
+    spotlightMoveSelection(step) {
+      if (this._spotlightCurrentItems.length === 0) return;
+      this._spotlightSelectedIndex = (this._spotlightSelectedIndex + step + this._spotlightCurrentItems.length) % this._spotlightCurrentItems.length;
+      
+      document.querySelectorAll('.spotlight-item').forEach((el, idx) => {
+        el.classList.toggle('selected', idx === this._spotlightSelectedIndex);
+        if (idx === this._spotlightSelectedIndex) {
+          el.scrollIntoView({ block: 'nearest' });
+        }
+      });
+    },
+
+    spotlightExecuteSelected() {
+      if (this._spotlightSelectedIndex >= 0 && this._spotlightSelectedIndex < this._spotlightCurrentItems.length) {
+        const item = this._spotlightCurrentItems[this._spotlightSelectedIndex];
+        item.action();
+        this.closeSpotlight();
+      }
+    },
+
+    onSpotlightInput(query) {
+      const q = query.trim().toLowerCase();
+      const resultsContainer = document.getElementById('spotlight-results');
+      if (!resultsContainer) return;
+
+      this._spotlightCurrentItems = [];
+      this._spotlightSelectedIndex = 0;
+
+      // When search is empty: show quick actions
+      if (!q) {
+        const quickActions = [
+          { icon: '🧮', title: 'فتح حاسبة التسعير المتكاملة', meta: 'حساب تكلفة STL/G-Code', action: () => this.switchTab('calculator') },
+          { icon: '➕', title: 'إنشاء عرض سعر رسمي جديد', meta: 'فتح نافذة عرض السعر', action: () => this.openNewOrderModal(true) },
+          { icon: '📦', title: 'إنشاء أمر إنتاج جديد', meta: 'طلب تصنيع مباشر', action: () => this.openNewOrderModal(false) },
+          { icon: '🧩', title: 'مشروع تجميعات قطع متعددة', meta: 'Multi-part Assembly', action: () => this.switchTab('assembly') },
+          { icon: '💡', title: 'حاسبة العائد على الاستثمار (ROI)', meta: 'نقطة التعادل وأرباح الماكينة', action: () => this.switchTab('roi') },
+          { icon: '📥', title: 'طلبات العملاء الواردة من Web', meta: 'متابعة inbox صفحة order.html', action: () => this.switchTab('customer-orders') },
+          { icon: '🏷️', title: 'إضافة منتج جديد للكتالوج', meta: 'تسجيل SKU جديد', action: () => this.openModal('modal-product') },
+          { icon: '💾', title: 'تصدير نسخة احتياطية (JSON)', meta: 'أمان وحفظ البيانات', action: () => this.exportBackup() }
+        ];
+
+        this._spotlightCurrentItems = quickActions;
+
+        resultsContainer.innerHTML = `
+          <div class="spotlight-group-title">⚡ إجراءات وتنقّل سريع</div>
+          ${quickActions.map((item, idx) => `
+            <div class="spotlight-item ${idx === 0 ? 'selected' : ''}" onclick="App._spotlightCurrentItems[${idx}].action(); App.closeSpotlight();">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="font-size:18px">${item.icon}</span>
+                <span style="font-weight:700">${item.title}</span>
+              </div>
+              <span class="spotlight-item-meta">${item.meta}</span>
+            </div>
+          `).join('')}
+        `;
+        return;
+      }
+
+      // 1. Search Orders
+      let ordersMatches = [];
+      try {
+        const orders = DB.getOrders ? DB.getOrders() : [];
+        orders.forEach(o => {
+          const matchCode = (o.code || '').toLowerCase().includes(q);
+          const matchCust = (o.customerName || '').toLowerCase().includes(q);
+          const matchPhone = (o.customerPhone || '').includes(q);
+          const matchItem = (o.items || []).some(it => (it.name || '').toLowerCase().includes(q));
+
+          if (matchCode || matchCust || matchPhone || matchItem) {
+            ordersMatches.push({
+              icon: o.stage === 'quotation' ? '📑' : '📦',
+              title: `${o.code} — ${o.customerName}`,
+              meta: `المرحلة: ${o.stage} • الإجمالي: ${o.financials?.totalPrice || 0} ج.م`,
+              action: () => {
+                this.switchTab(o.stage === 'quotation' ? 'quotations' : 'orders');
+              }
+            });
+          }
+        });
+      } catch (e) {}
+
+      // 2. Search Products
+      let productMatches = [];
+      try {
+        const products = Products.getProducts ? Products.getProducts() : [];
+        products.forEach(p => {
+          const matchName = (p.name || '').toLowerCase().includes(q);
+          const matchSku = (p.sku || '').toLowerCase().includes(q);
+          const matchDesc = (p.description || '').toLowerCase().includes(q);
+          const matchCat = (p.category || '').toLowerCase().includes(q);
+
+          if (matchName || matchSku || matchDesc || matchCat) {
+            productMatches.push({
+              icon: '🏷️',
+              title: `${p.name} (${p.sku})`,
+              meta: `${p.basePrice} ج.م • وزن: ${p.defaultWeightG}g`,
+              action: () => {
+                this.switchTab('products');
+                this.openProduct3DModal(p.id);
+              }
+            });
+          }
+        });
+      } catch (e) {}
+
+      // 3. Search Inventory
+      let invMatches = [];
+      try {
+        const fils = Inventory.getFilaments ? Inventory.getFilaments() : [];
+        fils.forEach(f => {
+          if ((f.name || '').toLowerCase().includes(q) || (f.material || '').toLowerCase().includes(q) || (f.color || '').toLowerCase().includes(q)) {
+            invMatches.push({
+              icon: '🧵',
+              title: `${f.name} — ${f.color}`,
+              meta: `متبقي: ${f.weightRemainingG}g • ${f.spoolPrice} ج.م`,
+              action: () => this.switchTab('inventory')
+            });
+          }
+        });
+
+        const hw = Inventory.getHardware ? Inventory.getHardware() : [];
+        hw.forEach(h => {
+          if ((h.name || '').toLowerCase().includes(q) || (h.category || '').toLowerCase().includes(q)) {
+            invMatches.push({
+              icon: '🔩',
+              title: h.name,
+              meta: `رصيد: ${h.quantity} ${h.unit || 'قطعة'}`,
+              action: () => this.switchTab('inventory')
+            });
+          }
+        });
+      } catch (e) {}
+
+      // 4. Search Customers
+      let custMatches = [];
+      try {
+        const customers = Customers.getCustomers ? Customers.getCustomers() : [];
+        customers.forEach(c => {
+          if ((c.name || '').toLowerCase().includes(q) || (c.phone || '').includes(q)) {
+            custMatches.push({
+              icon: '👥',
+              title: c.name,
+              meta: `هاتف: ${c.phone || '—'} • تعاملات: ${c.ordersCount || 0}`,
+              action: () => this.switchTab('customers')
+            });
+          }
+        });
+      } catch (e) {}
+
+      let allFound = [];
+      let htmlGroups = '';
+
+      if (ordersMatches.length > 0) {
+        htmlGroups += `<div class="spotlight-group-title">📦 الطلبات وعروض الأسعار (${ordersMatches.length})</div>`;
+        ordersMatches.forEach(item => {
+          const index = allFound.length;
+          allFound.push(item);
+          htmlGroups += `
+            <div class="spotlight-item ${index === 0 ? 'selected' : ''}" onclick="App._spotlightCurrentItems[${index}].action(); App.closeSpotlight();">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="font-size:18px">${item.icon}</span>
+                <span style="font-weight:700">${item.title}</span>
+              </div>
+              <span class="spotlight-item-meta">${item.meta}</span>
+            </div>`;
+        });
+      }
+
+      if (productMatches.length > 0) {
+        htmlGroups += `<div class="spotlight-group-title">🏷️ المنتجات والكتالوج (${productMatches.length})</div>`;
+        productMatches.forEach(item => {
+          const index = allFound.length;
+          allFound.push(item);
+          htmlGroups += `
+            <div class="spotlight-item ${index === 0 ? 'selected' : ''}" onclick="App._spotlightCurrentItems[${index}].action(); App.closeSpotlight();">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="font-size:18px">${item.icon}</span>
+                <span style="font-weight:700">${item.title}</span>
+              </div>
+              <span class="spotlight-item-meta">${item.meta}</span>
+            </div>`;
+        });
+      }
+
+      if (invMatches.length > 0) {
+        htmlGroups += `<div class="spotlight-group-title">🧵 المخزون والخامات (${invMatches.length})</div>`;
+        invMatches.forEach(item => {
+          const index = allFound.length;
+          allFound.push(item);
+          htmlGroups += `
+            <div class="spotlight-item ${index === 0 ? 'selected' : ''}" onclick="App._spotlightCurrentItems[${index}].action(); App.closeSpotlight();">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="font-size:18px">${item.icon}</span>
+                <span style="font-weight:700">${item.title}</span>
+              </div>
+              <span class="spotlight-item-meta">${item.meta}</span>
+            </div>`;
+        });
+      }
+
+      if (custMatches.length > 0) {
+        htmlGroups += `<div class="spotlight-group-title">👥 العملاء (${custMatches.length})</div>`;
+        custMatches.forEach(item => {
+          const index = allFound.length;
+          allFound.push(item);
+          htmlGroups += `
+            <div class="spotlight-item ${index === 0 ? 'selected' : ''}" onclick="App._spotlightCurrentItems[${index}].action(); App.closeSpotlight();">
+              <div style="display:flex; align-items:center; gap:10px">
+                <span style="font-size:18px">${item.icon}</span>
+                <span style="font-weight:700">${item.title}</span>
+              </div>
+              <span class="spotlight-item-meta">${item.meta}</span>
+            </div>`;
+        });
+      }
+
+      if (allFound.length === 0) {
+        htmlGroups = `
+          <div style="text-align:center; padding:35px 20px; color:var(--text-muted)">
+            <div style="font-size:36px; margin-bottom:8px">🔍</div>
+            <div style="font-weight:700; color:var(--text-primary)">لم يتم العثور على نتائج مطابقة لـ "${q}"</div>
+            <div style="font-size:0.8rem; margin-top:4px">تأكد من كتابة الكلمة بشكل صحيح، أو ابحث باسم العميل أو كود الصنف.</div>
+          </div>
+        `;
+      }
+
+      this._spotlightCurrentItems = allFound;
+      resultsContainer.innerHTML = htmlGroups;
+    }
 
   };
 
