@@ -420,6 +420,7 @@
                 <th>وقت الطباعة</th>
                 <th>شرائح الجملة</th>
                 <th>المستلزمات المطلوبة</th>
+                <th style="text-align:center">معاينة 3D</th>
               </tr>
             </thead>
             <tbody id="products-catalog-table-body">
@@ -640,15 +641,42 @@
             </div>
 
             <!-- شاشة العرض ثلاثي الأبعاد WebGL Viewport -->
-            <div class="calc-3d-viewport" id="calc-viewport-container">
+            <div class="calc-3d-viewport" id="calc-viewport-container" style="height: 320px;">
               <canvas id="calc-3d-canvas" class="calc-3d-canvas"></canvas>
-              <div class="viewport-controls-bar">
+              
+              <!-- شريط علوي للموديل ولوحة ألوان الفلمنت -->
+              <div class="viewport-toolbar-top">
                 <span class="viewport-pill" id="viewport-model-name">📦 نموذج معاينة ثلاثي الأبعاد</span>
-                <div style="display:flex; gap:6px; pointer-events:auto">
-                  <button type="button" class="viewport-btn" onclick="App.calcToggleWireframe()">🕸️ الشبك (Wireframe)</button>
-                  <button type="button" class="viewport-btn" onclick="App.calcResetCamera()">🔄 ضبط الزاوية</button>
+                <div style="display:flex; align-items:center; gap:5px; pointer-events:auto; background:rgba(255,255,255,0.92); backdrop-filter:blur(4px); padding:4px 10px; border-radius:99px; border:1px solid var(--border); box-shadow:var(--shadow-sm)">
+                  <span style="font-size:0.7rem; font-weight:700; color:var(--text-muted); margin-left:2px">اللون:</span>
+                  <button type="button" class="color-swatch-btn" style="background:#0284c7" onclick="App.calcSet3DColor('sky')" title="أزرق سماوي"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#0d9488" onclick="App.calcSet3DColor('teal')" title="تيل"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#1e293b" onclick="App.calcSet3DColor('black')" title="أسود مطفي"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#f8fafc; border:1px solid #cbd5e1" onclick="App.calcSet3DColor('white')" title="أبيض"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#eab308" onclick="App.calcSet3DColor('gold')" title="ذهبي حريري Silk"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#dc2626" onclick="App.calcSet3DColor('red')" title="أحمر ناري"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#16a34a" onclick="App.calcSet3DColor('green')" title="أخضر"></button>
+                  <button type="button" class="color-swatch-btn" style="background:#cbd5e1" onclick="App.calcSet3DColor('transparent')" title="شفاف"></button>
                 </div>
               </div>
+
+              <!-- شريط أدوات التحكم السفلي -->
+              <div class="viewport-controls-bar">
+                <div style="display:flex; gap:6px; pointer-events:auto">
+                  <button type="button" class="viewport-btn" id="btn-3d-autorotate" onclick="App.calcToggleAutoRotate()">🔄 تدوير تلقائي</button>
+                  <button type="button" class="viewport-btn" id="btn-3d-wireframe" onclick="App.calcToggleWireframe()">🕸️ الشبك</button>
+                  <button type="button" class="viewport-btn" id="btn-3d-bbox" onclick="App.calcToggleBBox()">📦 المقاسات</button>
+                  <button type="button" class="viewport-btn" onclick="App.calcResetCamera()">🎯 ضبط الزاوية</button>
+                </div>
+                <span class="viewport-pill" style="font-size:0.72rem; color:var(--text-muted)">🖱️ سحب للتدوير • بكرة للزووم</span>
+              </div>
+            </div>
+
+            <!-- شريط محاكاة بناء الطبقات (Slicing Height Simulation) -->
+            <div class="slicing-slider-box">
+              <span style="font-weight:700; color:var(--text-secondary); white-space:nowrap">⏳ محاكاة بناء الطبقات:</span>
+              <input type="range" id="calc-3d-slicing-slider" min="1" max="100" value="100" oninput="App.calcOnSlicingChange(this.value)">
+              <span class="badge" id="calc-3d-slicing-badge" style="background:#e0f2fe; color:#0284c7; min-width:55px; text-align:center">100%</span>
             </div>
 
             <!-- بار مواصفات الموديل الفورية -->
@@ -1520,6 +1548,97 @@
       </div>
     </section>
 
+  
+  <!-- نافذة استعراض المنتج ثلاثية الأبعاد (3D Product Showcase) -->
+  <div id="modal-product-3d-view" class="modal-overlay">
+    <div class="modal-card" style="max-width: 860px; max-height: 95vh;">
+      <div class="modal-header">
+        <div style="display:flex; align-items:center; gap:10px">
+          <span style="font-size:26px">🧊</span>
+          <div>
+            <h3 id="product-3d-modal-title" style="font-size:1.1rem; font-weight:800">استعراض المنتج ثلاثي الأبعاد</h3>
+            <p style="font-size:0.75rem; color:var(--text-muted); margin-top:2px">معاينة واقعية 360 درجة مع تجربة ألوان الخامات ومحاكاة الأبعاد</p>
+          </div>
+        </div>
+        <button class="modal-close" onclick="App.closeModal('modal-product-3d-view')">✕</button>
+      </div>
+
+      <div style="display:grid; grid-template-columns: 1fr 300px; gap:18px; align-items:start">
+        <div>
+          <!-- مساحة العرض ثلاثي الأبعاد -->
+          <div class="calc-3d-viewport" id="product-3d-viewport-container" style="height: 360px; position:relative;">
+            <canvas id="product-3d-canvas" class="calc-3d-canvas"></canvas>
+            
+            <div class="viewport-toolbar-top">
+              <span class="viewport-pill" id="product-3d-badge-name">مجسم ثلاثي الأبعاد</span>
+              <div style="display:flex; gap:6px; pointer-events:auto">
+                <button type="button" class="viewport-btn" onclick="App.product3DToggleWireframe()">🕸️ الشبك</button>
+                <button type="button" class="viewport-btn" onclick="App.product3DResetCamera()">🎯 ضبط</button>
+              </div>
+            </div>
+
+            <div class="viewport-controls-bar">
+              <span class="viewport-pill" style="font-size:0.72rem; color:var(--text-muted)">🖱️ تدوير 360° بالماوس واللمس</span>
+            </div>
+          </div>
+
+          <!-- شريط ألوان الفلمنت لتجربة الألوان -->
+          <div style="display:flex; align-items:center; justify-content:space-between; background:var(--bg-secondary); border:1px solid var(--border); border-radius:var(--radius-sm); padding:10px 14px; margin-top:10px">
+            <span style="font-size:0.8rem; font-weight:700; color:var(--text-secondary)">🎨 تجربة ألوان الخامات:</span>
+            <div style="display:flex; gap:6px; align-items:center">
+              <button type="button" class="color-swatch-btn" style="background:#0284c7" onclick="App.product3DSetColor('sky')" title="أزرق"></button>
+              <button type="button" class="color-swatch-btn" style="background:#0d9488" onclick="App.product3DSetColor('teal')" title="تيل"></button>
+              <button type="button" class="color-swatch-btn" style="background:#1e293b" onclick="App.product3DSetColor('black')" title="أسود"></button>
+              <button type="button" class="color-swatch-btn" style="background:#f8fafc; border:1px solid #cbd5e1" onclick="App.product3DSetColor('white')" title="أبيض"></button>
+              <button type="button" class="color-swatch-btn" style="background:#eab308" onclick="App.product3DSetColor('gold')" title="ذهبي"></button>
+              <button type="button" class="color-swatch-btn" style="background:#dc2626" onclick="App.product3DSetColor('red')" title="أحمر"></button>
+              <button type="button" class="color-swatch-btn" style="background:#16a34a" onclick="App.product3DSetColor('green')" title="أخضر"></button>
+              <button type="button" class="color-swatch-btn" style="background:#cbd5e1" onclick="App.product3DSetColor('transparent')" title="شفاف"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- بطاقة تفاصيل ومواصفات المنتج -->
+        <div style="background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); padding:18px; box-shadow:var(--shadow-sm); display:flex; flex-direction:column; justify-content:space-between; min-height:420px">
+          <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px">
+              <span class="badge" id="product-3d-sku" style="background:#e0f2fe; color:#0284c7; font-family:monospace; font-weight:800">SKU-001</span>
+              <span class="badge" id="product-3d-cat" style="background:#f1f5f9; color:var(--text-muted)">ديكور</span>
+            </div>
+            
+            <h4 id="product-3d-name" style="font-size:1.15rem; font-weight:800; color:var(--text-primary); margin-bottom:6px">اسم المنتج</h4>
+            <p id="product-3d-desc" style="font-size:0.8rem; color:var(--text-muted); line-height:1.5; margin-bottom:16px"></p>
+
+            <div style="display:flex; flex-direction:column; gap:8px; font-size:0.84rem; background:var(--bg-secondary); padding:12px; border-radius:var(--radius-sm); border:1px solid var(--border)">
+              <div style="display:flex; justify-content:space-between">
+                <span style="color:var(--text-muted)">⚖️ وزن الفلمنت:</span>
+                <strong id="product-3d-weight">0 جرام</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between">
+                <span style="color:var(--text-muted)">⏱️ زمن الطباعة:</span>
+                <strong id="product-3d-hours">0 ساعة</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between">
+                <span style="color:var(--text-muted)">📐 الأبعاد التقريبية:</span>
+                <strong id="product-3d-dims">60 × 60 × 80 مم</strong>
+              </div>
+            </div>
+
+            <div style="margin-top:16px; padding:12px; background:linear-gradient(135deg, rgba(2,132,199,0.06), rgba(22,163,74,0.08)); border:1px solid var(--border-bright); border-radius:var(--radius-sm)">
+              <div style="font-size:0.75rem; color:var(--text-muted)">سعر البيع المعتمد بالكتالوج:</div>
+              <div style="font-size:1.6rem; font-weight:900; color:var(--accent)" id="product-3d-price">0 ج.م</div>
+            </div>
+          </div>
+
+          <div style="display:flex; flex-direction:column; gap:8px; margin-top:18px">
+            <button type="button" class="btn btn-primary btn-sm btn-full" onclick="App.product3DCreateQuote()">📄 إنشاء عرض سعر رسمي للقطعة</button>
+            <button type="button" class="btn btn-success btn-sm btn-full" onclick="App.product3DCreateOrder()">📦 بدء أمر إنتاج فوري بالورشة</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   </main>
 
   <!-- نوافذ Modal التفاعلية -->
@@ -1902,6 +2021,7 @@
 
   <!-- Scripts -->
   <script src="js/vendor/three.min.js"></script>
+  <script src="js/core/viewer3d.js"></script>
   <script src="js/core/db.js"></script>
   <script src="js/core/calc.js"></script>
   <script src="js/core/events.js"></script>

@@ -426,6 +426,7 @@
 
     let offset = 84;
     const totalTris = Math.min(triangleCount, Math.floor((dv.byteLength - 84) / 50));
+    const positions = new Float32Array(totalTris * 9);
 
     for (let i = 0; i < totalTris; i++) {
       // Normal vector (skipped, 12 bytes)
@@ -448,6 +449,12 @@
 
       // Attribute byte count (2 bytes)
       offset += 2;
+
+      // Store in positions array for Three.js BufferGeometry
+      const idx = i * 9;
+      positions[idx] = x1; positions[idx + 1] = y1; positions[idx + 2] = z1;
+      positions[idx + 3] = x2; positions[idx + 4] = y2; positions[idx + 5] = z2;
+      positions[idx + 6] = x3; positions[idx + 7] = y3; positions[idx + 8] = z3;
 
       // Bounding box
       minX = Math.min(minX, x1, x2, x3); maxX = Math.max(maxX, x1, x2, x3);
@@ -482,7 +489,8 @@
       volumeMm3: round(volumeMm3, 2),
       volumeCm3: round(volumeMm3 / 1000, 3),
       surfaceAreaMm2: round(surfaceArea, 2),
-      surfaceAreaCm2: round(surfaceArea / 100, 2)
+      surfaceAreaCm2: round(surfaceArea / 100, 2),
+      positions: positions
     };
   }
 
@@ -504,11 +512,17 @@
     let signedVolume = 0;
     let surfaceArea = 0;
     const totalTris = Math.floor(vertices.length / 3);
+    const positions = new Float32Array(totalTris * 9);
 
     for (let i = 0; i < totalTris; i++) {
       const v1 = vertices[i * 3];
       const v2 = vertices[i * 3 + 1];
       const v3 = vertices[i * 3 + 2];
+
+      const idx = i * 9;
+      positions[idx] = v1.x; positions[idx + 1] = v1.y; positions[idx + 2] = v1.z;
+      positions[idx + 3] = v2.x; positions[idx + 4] = v2.y; positions[idx + 5] = v2.z;
+      positions[idx + 6] = v3.x; positions[idx + 7] = v3.y; positions[idx + 8] = v3.z;
 
       minX = Math.min(minX, v1.x, v2.x, v3.x); maxX = Math.max(maxX, v1.x, v2.x, v3.x);
       minY = Math.min(minY, v1.y, v2.y, v3.y); maxY = Math.max(maxY, v1.y, v2.y, v3.y);
@@ -540,7 +554,8 @@
       volumeMm3: round(volumeMm3, 2),
       volumeCm3: round(volumeMm3 / 1000, 3),
       surfaceAreaMm2: round(surfaceArea, 2),
-      surfaceAreaCm2: round(surfaceArea / 100, 2)
+      surfaceAreaCm2: round(surfaceArea / 100, 2),
+      positions: positions
     };
   }
 

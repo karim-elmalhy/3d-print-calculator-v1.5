@@ -8,6 +8,8 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 <style>body{font-family:'Segoe UI',Tahoma,sans-serif}</style>
+  <script src="js/vendor/three.min.js"></script>
+  <script src="js/core/viewer3d.js"></script>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col items-center py-6 px-4">
 
@@ -45,7 +47,20 @@
         <label class="block text-xs font-bold text-slate-600 mb-1">رفع ملف الموديل (اختياري)</label>
         <p class="text-[11px] text-slate-400 mb-1.5">لو معاك ملف G-code هتاخد السعر فورًا. لو معاك STL بس، الطلب هيتراجع ويتحدد سعره يدويًا.</p>
         <input id="f_file" type="file" accept=".stl,.gcode,.gco,.g,.nc" class="w-full text-xs file:ml-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-600 file:text-white file:text-xs file:font-bold">
+        
         <div id="fileAnalysisBox" class="hidden mt-2 p-2.5 rounded-lg bg-blue-50 border border-blue-200 text-xs text-blue-800"></div>
+
+        <!-- عارض 3D تفاعلي للملف المرفوع -->
+        <div id="order3DViewportBox" class="hidden mt-3 rounded-xl overflow-hidden border border-slate-200 bg-slate-50 relative" style="height: 250px;">
+          <canvas id="order3DCanvas" style="width:100%; height:100%; display:block"></canvas>
+          <div class="absolute bottom-2 left-2 right-2 flex justify-between items-center pointer-events-none">
+            <span id="order3DModelName" class="text-xs bg-white/95 backdrop-blur px-2.5 py-1 rounded-full font-bold shadow-sm pointer-events-auto text-slate-700">📦 نموذج 3D</span>
+            <div class="flex gap-1 pointer-events-auto">
+              <button type="button" onclick="window.orderViewer && window.orderViewer.toggleWireframe()" class="text-xs bg-white/95 backdrop-blur px-2 py-1 rounded shadow-sm text-slate-600 hover:text-blue-600 font-bold">🕸️ شبك</button>
+              <button type="button" onclick="window.orderViewer && window.orderViewer.resetView()" class="text-xs bg-white/95 backdrop-blur px-2 py-1 rounded shadow-sm text-slate-600 hover:text-blue-600 font-bold">🎯 ضبط</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div>
@@ -100,6 +115,24 @@
 // حط هنا رابط الـ Web App اللي طلع بعد نشر Google Apps Script
 const APPS_SCRIPT_URL = 'PASTE_YOUR_DEPLOYED_WEB_APP_URL_HERE';
 // ============================================
+
+
+let orderViewerInstance = null;
+
+function initOrder3DViewer() {
+  const container = document.getElementById('order3DViewportBox');
+  const canvas = document.getElementById('order3DCanvas');
+  if (!container || !canvas || !window.WorkshopViewer3D) return null;
+  if (!orderViewerInstance) {
+    orderViewerInstance = window.WorkshopViewer3D.createViewer(canvas, container, {
+      bedWidth: 220,
+      bedDepth: 220,
+      color: 0x0284c7
+    });
+    window.orderViewer = orderViewerInstance;
+  }
+  return orderViewerInstance;
+}
 
 let extractedFileData = null; // { fileType, fileName, base64, weight, hours }
 const MAX_FILE_MB = 15;

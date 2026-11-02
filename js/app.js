@@ -385,6 +385,9 @@
             <td>${p.defaultPrintHours} س</td>
             <td><small>${tiersText}</small></td>
             <td><small>${hwText}</small></td>
+            <td style="text-align:center">
+              <button type="button" class="btn btn-xs btn-primary" onclick="App.openProduct3DModal('${p.id}')">👁️ استعراض 3D</button>
+            </td>
           </tr>
         `;
       }).join('');
@@ -822,6 +825,15 @@
       const canvas = document.getElementById('calc-3d-canvas');
       if (!container || !canvas) return;
 
+      if (root.WorkshopViewer3D) {
+        this._main3DViewer = root.WorkshopViewer3D.createViewer(canvas, container, {
+          bedWidth: 225,
+          bedDepth: 225,
+          color: root.WorkshopViewer3D.FILAMENT_COLORS.sky.hex
+        });
+        return;
+      }
+
       if (typeof THREE === 'undefined') {
         const ctx = canvas.getContext('2d');
         if (ctx) {
@@ -1105,7 +1117,11 @@
           if (areaEl) areaEl.textContent = `${parsed.surfaceAreaCm2} cm²`;
           if (triEl) triEl.textContent = parsed.triangleCount.toLocaleString('ar-EG');
 
-          this.calcUpdate3DGeometry(this._modelGeometry, `📂 ${this._modelGeometry.name}`);
+          if (this._main3DViewer && parsed.positions) {
+            this._main3DViewer.loadSTLPositions(parsed.positions, file.name);
+          } else {
+            this.calcUpdate3DGeometry(this._modelGeometry, `📂 ${this._modelGeometry.name}`);
+          }
           this.calcAutoNesting();
           this.calcUpdate();
         } catch (err) {
@@ -2225,7 +2241,135 @@
       this.customerOrdersUpdateBadge();
     }
 
+,
+    // ==========================================
+    // Advanced 3D Engine & Showcase Controls
+    // ==========================================
+    calcSet3DColor(colorKey) {
+      if (this._main3DViewer) {
+        this._main3DViewer.setColor(colorKey);
+      }
+    },
+
+    calcToggleAutoRotate() {
+      if (this._main3DViewer) {
+        const active = this._main3DViewer.toggleAutoRotate();
+        const btn = document.getElementById('btn-3d-autorotate');
+        if (btn) btn.classList.toggle('active', active);
+      }
+    },
+
+    calcToggleBBox() {
+      if (this._main3DViewer) {
+        this._showBBox = !this._showBBox;
+        this._main3DViewer.toggleBoundingBox(this._showBBox);
+        const btn = document.getElementById('btn-3d-bbox');
+        if (btn) btn.classList.toggle('active', this._showBBox);
+      }
+    },
+
+    calcOnSlicingChange(val) {
+      const num = parseInt(val, 10);
+      if (this._main3DViewer) {
+        this._main3DViewer.setSlicePercent(num);
+      }
+      const badge = document.getElementById('calc-3d-slicing-badge');
+      if (badge) badge.textContent = num + '%';
+    },
+
+    // ==========================================
+    // 3D Product Showcase (كتالوج المنتجات)
+    // ==========================================
+    _activeProduct3D: null,
+    _product3DViewer: null,
+
+    openProduct3DModal(productId) {
+      const prod = Products.getProductById(productId);
+      if (!prod) return;
+
+      this._activeProduct3D = prod;
+
+      document.getElementById('product-3d-modal-title').textContent = `استعراض: ${prod.name}`;
+      document.getElementById('product-3d-badge-name').textContent = prod.name;
+      document.getElementById('product-3d-name').textContent = prod.name;
+      document.getElementById('product-3d-sku').textContent = prod.sku;
+      document.getElementById('product-3d-cat').textContent = prod.category;
+      document.getElementById('product-3d-desc').textContent = prod.description || 'منتج عالي الجودة مطبوع بتقنية FDM بدقة متناهية وطبقات ملتحمة.';
+      document.getElementById('product-3d-weight').textContent = `${prod.defaultWeightG} جرام`;
+      document.getElementById('product-3d-hours').textContent = `${prod.defaultPrintHours} ساعة`;
+      document.getElementById('product-3d-price').textContent = `${prod.basePrice} ج.م`;
+
+      // Approximate dimensions based on category & weight
+      const estDim = Math.round(Math.cbrt((prod.defaultWeightG / 1.24) * 1000));
+      document.getElementById('product-3d-dims').textContent = `${estDim} × ${estDim} × ${Math.round(estDim * 1.2)} مم`;
+
+      this.openModal('modal-product-3d-view');
+
+      // Initialize or reuse product 3D viewer
+      setTimeout(() => {
+        const container = document.getElementById('product-3d-viewport-container');
+        const canvas = document.getElementById('product-3d-canvas');
+        if (!container || !canvas || !root.WorkshopViewer3D) return;
+
+        if (!this._product3DViewer) {
+          this._product3DViewer = root.WorkshopViewer3D.createViewer(canvas, container, {
+            bedWidth: 200,
+            bedDepth: 200,
+            color: root.WorkshopViewer3D.FILAMENT_COLORS.sky.hex
+          });
+        }
+
+        // Determine shape
+        let shapeType = 'box';
+        const nameLower = (prod.name + ' ' + (prod.sku || '')).toLowerCase();
+        if (nameLower.includes('moon') || nameLower.includes('قمر') || nameLower.includes('مصباح')) shapeType = 'moon-lamp';
+        else if (nameLower.includes('stand') || nameLower.includes('حامل')) shapeType = 'phone-stand';
+        else if (nameLower.includes('key') || nameLower.includes('ميدالية')) shapeType = 'keychain';
+        else if (nameLower.includes('vase') || nameLower.includes('فازة')) shapeType = 'vase';
+        else if (nameLower.includes('gear') || nameLower.includes('ترس')) shapeType = 'gear';
+
+        this._product3DViewer.loadProceduralModel(shapeType, { width: estDim, depth: estDim, height: Math.round(estDim * 1.2) });
+      }, 100);
+    },
+
+    product3DSetColor(colorKey) {
+      if (this._product3DViewer) {
+        this._product3DViewer.setColor(colorKey);
+      }
+    },
+
+    product3DToggleWireframe() {
+      if (this._product3DViewer) {
+        this._product3DViewer.toggleWireframe();
+      }
+    },
+
+    product3DResetCamera() {
+      if (this._product3DViewer) {
+        this._product3DViewer.resetView();
+      }
+    },
+
+    product3DCreateQuote() {
+      if (!this._activeProduct3D) return;
+      const prod = this._activeProduct3D;
+      this.closeModal('modal-product-3d-view');
+      this.openNewOrderModal(true);
+      document.getElementById('order-product-select').value = prod.id;
+      this.onOrderProductSelected();
+    },
+
+    product3DCreateOrder() {
+      if (!this._activeProduct3D) return;
+      const prod = this._activeProduct3D;
+      this.closeModal('modal-product-3d-view');
+      this.openNewOrderModal(false);
+      document.getElementById('order-product-select').value = prod.id;
+      this.onOrderProductSelected();
+    },
+
   };
+
 
 
   root.App = App;

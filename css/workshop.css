@@ -1551,3 +1551,55 @@ tr:hover td {
   from { background-position: 200% 0; }
   to { background-position: -200% 0; }
 }
+
+
+/* ===== 3D VIEWER ADVANCED CONTROLS & COLOR SWATCHES ===== */
+.color-swatch-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  padding: 0;
+  display: inline-block;
+}
+.color-swatch-btn:hover {
+  transform: scale(1.22);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+}
+.color-swatch-btn.active {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.slicing-slider-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 14px;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.8rem;
+  box-shadow: var(--shadow-sm);
+}
+.slicing-slider-box input[type="range"] {
+  flex: 1;
+  accent-color: var(--accent);
+  cursor: pointer;
+  height: 6px;
+}
+
+.viewport-toolbar-top {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  pointer-events: none;
+}
